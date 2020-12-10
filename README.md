@@ -69,8 +69,13 @@ Install the required packages
 Install Recover as a package
 - `pip install -e .`
 
-You also need to clone and install the *reservoir* package
+Install rdkit and torch-geometric with conda:
+- `conda install -c rdkit rdkit`
+- `conda install -c conda-forge pytorch_geometric`
 
+You also need to clone and install the *reservoir* package
+- `cd <path_to_Reservoir>/Reservoir`
+- `python setup.py develop`
 
 ## Running the pipeline
 
