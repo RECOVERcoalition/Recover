@@ -1,8 +1,8 @@
-# RECOVER: Exploring the space of drug combinations to discover synergistic drugs using Active Learning
+# Recover: Exploring the space of drug combinations to discover synergistic drugs using Active Learning
 
 RECOVER coalition (Mila, Relation Therapeutics)
 
-This RECOVER repository is based on research funded by (or in part by) the Bill & Melinda Gates Foundation. The findings and 
+This Recover repository is based on research funded by (or in part by) the Bill & Melinda Gates Foundation. The findings and 
 conclusions contained within are those of the authors and do not necessarily reflect positions or policies of the Bill & Melinda Gates Foundation.
 
 ## Abstract
@@ -50,7 +50,7 @@ used by the **acquisition functions**.
 Our early simulations on oncology data suggest that, compared to a naive approach,
 a 10 fold improvement in the speed at which best combinations are found is possible.
 
-<img src="docs/images/scores.png" alt="Proportion of top 1% synergistic combinations discovered along training" width="600"/>
+<img src="docs/images/scores.png" alt="Proportion of top 1% synergistic combinations discovered along training" width="400"/>
 
 - **y-axis**: Proportion of top 1% synergistic combinations which have been discovered along active learning training.
 - **x-axis**: Number of active learning iterations
@@ -63,10 +63,10 @@ First create a conda environment
 - `conda install -c anaconda pip`
 
 Install the required packages
-- `cd <path_to_project>/RECOVER`
+- `cd <path_to_project>/Recover`
 - `pip install -r requirements.txt`
 
-Install RECOVER as a package
+Install Recover as a package
 - `pip install -e .`
 
 You also need to clone and install the *reservoir* package
@@ -74,10 +74,10 @@ You also need to clone and install the *reservoir* package
 
 ## Running the pipeline
 
-An example of configuration file is provided in `RECOVER/recover/config/test.py`
+An example of configuration file is provided in `Recover/recover/config/test.py`
 
 To run the pipeline:
-- Create your configuration file and move it to `RECOVER/recover/config/`
+- Create your configuration file and move it to `Recover/recover/config/`
 - Run `python train.py --config <my_configuration_file>`
 
 Note that `<my_configuration_file>` should not include *.py*. For example, to run the pipeline with configuration from 
