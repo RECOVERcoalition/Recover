@@ -169,7 +169,7 @@ testpath==0.4.4
 thinc==7.0.8
 threadpoolctl==2.1.0
 toml==0.10.2
-torch==1.7.1
+torch==1.7.0
 torchvision==0.8.2
 tornado==6.0.4
 tqdm
