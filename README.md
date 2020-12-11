@@ -25,7 +25,7 @@ an active learning based algorithm**. At regular intervals, the algorithm recomm
 tested in vitro, and the results of the experiments are added to the training data to update the model. 
 
 Our proposed algorithm integrates several data modalities (protein-protein interaction network, drug 
-targets, drug structure, transcriptomic signatures), makes us of recent deep learning approaches such 
+targets, drug structure, transcriptomic signatures), makes use of recent deep learning approaches such 
 as graph convolutional networks and attention, Monte Carlo dropout for uncertainty estimation, and several acquisition 
 functions for efficient exploration.
 
@@ -47,7 +47,7 @@ used by the **acquisition functions**.
 
 ## Early results
 
-Our early simulations on oncology data suggest that, compared to a naive approach,
+Our early simulations on historical oncology data suggest that, compared to a naive approach,
 a 10 fold improvement in the speed at which best combinations are found is possible.
 
 <img src="docs/images/scores.png" alt="Proportion of top 1% synergistic combinations discovered along training" width="400"/>
