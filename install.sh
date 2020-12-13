@@ -1,5 +1,5 @@
-conda create --name recover python=3.6
-conda activate recover
+conda create --name recover-test python=3.6
+conda activate recover-test
 
 # Install pip
 conda install -c anaconda pip
@@ -18,6 +18,7 @@ conda install -c rdkit rdkit
 # Install pytorch geometric
 TORCH=$(python -c "import torch; print(torch.__version__)")
 CUDA=$(python -c "import torch; print(torch.version.cuda)")
+CUDA="cu${CUDA//.}"
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
