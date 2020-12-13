@@ -57,25 +57,27 @@ a 10 fold improvement in the speed at which best combinations are found is possi
 
 ## Environment setup
 
+**Requirements**: Anaconda (https://www.anaconda.com/) and Git LFS (https://git-lfs.github.com/). Please make sure both are installed on the system prior to running installation.
+
+**Installation**: enter the command `source install.sh` and follow the instructions. This will create a conda environment named **recover** and install all the required package including the [reservoir](https://github.com/RECOVERcoalition/Reservoir) package that stores the primary data acquisition scripts.
+
+<!---
 First create a conda environment
 - `conda create --name recover`. This will create an environment named *recover*
 - `conda activate recover`
 - `conda install -c anaconda pip`
-
 Install the required packages
 - `cd <path_to_project>/Recover`
 - `pip install -r requirements.txt`
-
 Install Recover as a package
 - `pip install -e .`
-
 Install rdkit and torch-geometric with conda:
 - `conda install -c rdkit rdkit`
 - `conda install -c conda-forge pytorch_geometric`
-
 You also need to clone and install the *reservoir* package
 - `cd <path_to_Reservoir>/Reservoir`
 - `python setup.py develop`
+--->
 
 ## Running the pipeline
 
