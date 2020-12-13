@@ -1,5 +1,5 @@
-conda create --name recover-test python=3.6
-conda activate recover-test
+conda create --name recover python=3.6
+conda activate recover
 
 # Install pip
 conda install -c anaconda pip
