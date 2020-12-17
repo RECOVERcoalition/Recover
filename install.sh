@@ -18,7 +18,7 @@ conda install -c rdkit rdkit
 # Install pytorch geometric
 TORCH=$(python -c "import torch; print(torch.__version__)")
 CUDA=$(python -c "import torch; print(torch.version.cuda)")
-CUDA="cu${CUDA//.}"
+if [[ $CUDA = "None" ]]; then CUDA="cpu"; else CUDA="cu${CUDA//.}"; fi
 pip install torch-scatter -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-sparse -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
 pip install torch-cluster -f https://pytorch-geometric.com/whl/torch-${TORCH}+${CUDA}.html
