@@ -120,7 +120,7 @@ py-spy==0.3.3
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
 pycparser
-Pygments==2.6.1
+Pygments==2.7.4
 pymongo==3.11.0
 pyOpenSSL
 pyparsing==2.4.7
