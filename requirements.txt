@@ -131,7 +131,7 @@ python-dateutil==2.8.1
 pytorch-pretrained-bert==0.6.2
 pytorch-transformers==1.1.0
 pytz==2020.1
-PyYAML==5.3.1
+PyYAML==5.4.0
 pyzmq==19.0.1
 qtconsole
 QtPy==1.9.0
