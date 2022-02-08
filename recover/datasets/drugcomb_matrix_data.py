@@ -1,114 +1,116 @@
-from torch_geometric.data import Data, InMemoryDataset, download_url
-from recover.datasets.l1000_data import L1000
 import numpy as np
 import pandas as pd
 import torch
 import os
 import random
-import reservoir as rsv
-from recover.utils import get_project_root, get_fingerprint
-from recover.datasets.utils import (
-    process_l1000,
-    process_data,
-    get_ddi_edges,
-    get_dpi_edges,
-    get_ppi_edges,
-    get_drug_nodes,
-    get_protein_nodes,
-    fit_sigmoid_on_monotherapies,
-    drug_level_random_split,
-    pair_level_random_split,
-)
-import zipfile
+import copy
+import reservoir as rdl
+from sklearn.decomposition import PCA
+from pandas.api.types import is_string_dtype, is_numeric_dtype
+from pathlib import Path
+from recover.utils.utils import get_project_root, get_fingerprint
+
+########################################################################################################################
+# Underlying data object
+########################################################################################################################
 
 
-class DrugCombMatrix(InMemoryDataset):
+class Data(object):
+    def __init__(self, **kwargs):
+        for key, item in kwargs.items():
+            self[key] = item
+
+    def __getitem__(self, key):
+        r"""Gets the data of the attribute :obj:`key`."""
+        return getattr(self, key, None)
+
+    def __setitem__(self, key, value):
+        """Sets the attribute :obj:`key` to :obj:`value`."""
+        setattr(self, key, value)
+
+    def to(self, device, *keys, **kwargs):
+        r"""Performs tensor dtype and/or device conversion to all attributes
+        :obj:`*keys`.
+        If :obj:`*keys` is not given, the conversion is applied to all present
+        attributes."""
+        return self.apply(lambda x: x.to(device, **kwargs), *keys)
+
+    def apply(self, func, *keys):
+        r"""Applies the function :obj:`func` to all tensor attributes
+        :obj:`*keys`. If :obj:`*keys` is not given, :obj:`func` is applied to
+        all present attributes.
+        """
+        for key, item in self(*keys):
+            self[key] = self.__apply__(item, func)
+        return self
+
+    def __apply__(self, item, func):
+        if torch.is_tensor(item):
+            return func(item)
+        elif isinstance(item, (tuple, list)):
+            return [self.__apply__(v, func) for v in item]
+        elif isinstance(item, dict):
+            return {k: self.__apply__(v, func) for k, v in item.items()}
+        else:
+            return item
+
+    def __call__(self, *keys):
+        r"""Iterates over all attributes :obj:`*keys` in the data, yielding
+        their attribute names and content.
+        If :obj:`*keys` is not given this method will iterative over all
+        present attributes."""
+        for key in sorted(self.keys) if not keys else keys:
+            yield key, self[key]
+
+    @property
+    def keys(self):
+        r"""Returns all names of graph attributes."""
+        keys = [key for key in self.__dict__.keys() if self[key] is not None]
+        keys = [key for key in keys if key[:2] != '__' and key[-2:] != '__']
+        return keys
+
+
+########################################################################################################################
+# Main Dataset object
+########################################################################################################################
+
+
+class DrugCombMatrix:
     def __init__(
-        self,
-        transform=None,
-        pre_transform=None,
-        fp_bits=1024,
-        fp_radius=4,
-        ppi_graph="huri.csv",
-        dti_graph="chembl_dtis.csv",
-        cell_line=None,
-        use_l1000=False,
-        restrict_to_l1000_covered_drugs=False,
+            self,
+            fp_bits=1024,
+            fp_radius=4,
+            cell_line=None,
+            study_name="ALMANAC",
+            in_house_data="without",
+            rounds_to_include=(),
     ):
-        """
-        Dataset object for the pipeline. It creates a `torch_geometric.data.Data` object containing various attributes,
-        including:
-            - x_drugs: tensor of drug features (fingerprints, differential expression profiles)
-                Shape (n_drugs, n_drug_features)
-            - x_prots: tensor of protein features (derived from protein sequence)
-            - ppi_edge_idx: list of protein-protein interaction edges.
-                Shape (2, num_ppi_edges)
-            - dpi_edge_idx: list of drug-protein interaction edges.
-                Shape (2, num_dpi_edges)
-            - data.ddi_edge_idx: list of pairwise drug combinations available in the DrugComb dataset.
-                Shape (2, num_ddi_edges)
-            - ddi_edge_<score>: tensor containing synergy score for pairs of drugs
-            - ddi_edge_inhibitions: list of raw inhibition matrices for pairwise drug combinations. The associated pairs
-                of concentrations are stored in ddi_edge_conc_pair.
-            - ddi_edge_inhibition_<r, c>: list of monotherapy inihitions for the row/column drug of a given pairwise
-                combination. The associated concentrations are stored in ddi_edge_conc_<r, c>
-
-
-        :param transform: A function/transform that takes in an
-            :obj:`torch_geometric.data.Data` object and returns a transformed
-            version. The data object will be transformed before every access.
-        :param pre_transform: A function/transform that takes in
-            an :obj:`torch_geometric.data.Data` object and returns a
-            transformed version. The data object will be transformed before
-            being saved to disk. (default: :obj:`None`)
-        :param fp_bits: number of bits for fingerprints
-        :param fp_radius: radius for fingerprints
-        :param ppi_graph: Name of the database to use for protein-protein interactions
-        :param dti_graph: Name of the database to use for drug-target interactions
-        :param cell_line: Name of the cell line to include (e.g. 'K-562'). If None, all cell lines are included
-        :param use_l1000: If True, features from the L1000 dataset will used. Each drug will be associated with two
-            differencial gene expression profiles acquired on cell lines PC3 and MCF7
-        :param restrict_to_l1000_covered_drugs: If True, only the drugs covered in both L1000 and DrugComb will be
-            .included
-        """
-
         self.fp_bits = fp_bits
         self.fp_radius = fp_radius
-        self.ppi_graph = ppi_graph
-        self.dti_graph = dti_graph
-        self.use_l1000 = use_l1000
-        self.restrict_to_l1000_covered_drugs = restrict_to_l1000_covered_drugs
+        self.cell_line = cell_line
+        self.study_name = study_name
+        self.rounds_to_include = list(rounds_to_include)
 
-        assert self.dti_graph in rsv.available_dtis()
-        assert self.ppi_graph in rsv.available_ppis()
+        assert in_house_data in ["with", "without", "in_house_only"]
+        self.in_house_data = in_house_data
 
-        super().__init__(
-            os.path.join(get_project_root(), "DrugComb/"), transform, pre_transform
-        )
+        if in_house_data != "without":
+            assert len(self.rounds_to_include) > 0
 
         # Load processed dataset
-        self.data, self.slices = torch.load(self.processed_paths[0])
-
-        # If the parameters do not correspond to the processed dataset, reprocess dataset
-        if (
-            self.data.fp_bits != self.fp_bits
-            or self.data.fp_radius != self.fp_radius
-            or self.data.ppi_graph[0] != self.ppi_graph
-            or self.data.dti_graph[0] != self.dti_graph
-            or self.data.use_l1000 != self.use_l1000
-            or self.data.restrict_to_l1000_covered_drugs
-            != self.restrict_to_l1000_covered_drugs
-        ):
-            self.data, self.slices = 0, 0
-            self.process()
-            self.data, self.slices = torch.load(self.processed_paths[0])
+        saved_file = os.path.join(self.processed_paths, "processed", self.processed_file_name)
+        if os.path.isfile(saved_file):
+            self.data = torch.load(saved_file)
+        else:
+            Path(os.path.join(self.processed_paths, "processed")).mkdir(parents=True, exist_ok=True)
+            self.data = self.process()
 
         # Select a specific cell line is cell_line is not None
         if cell_line is not None:
-            assert cell_line in self.data.cell_line_to_idx_dict[0].keys()
+            assert cell_line in self.data.cell_line_to_idx_dict.keys()
             ixs = (
-                self.data.ddi_edge_classes
-                == self.data.cell_line_to_idx_dict[0][cell_line]
+                    self.data.ddi_edge_classes
+                    == self.data.cell_line_to_idx_dict[cell_line]
             )
             for attr in dir(self.data):
                 if attr.startswith("ddi_edge_idx"):
@@ -116,373 +118,789 @@ class DrugCombMatrix(InMemoryDataset):
                 elif attr.startswith("ddi_edge_"):
                     self.data[attr] = self.data[attr][ixs]
 
-        if self.transform is not None:
-            self.data = self.transform(self.data)
+            # # Update cell line index in case some cell lines have been removed
+            # new_unique_cell_lines = self.data.ddi_edge_classes.unique()
+            # old_idx_to_new_idx = {
+            #     int(new_unique_cell_lines[i]): i for i in range(len(new_unique_cell_lines))
+            # }
+            # # Update cell_line_to_idxs dictionary
+            # self.data.cell_line_to_idx_dict = {
+            #     k: old_idx_to_new_idx[self.data.cell_line_to_idx_dict[k]]
+            #     for k in self.data.cell_line_to_idx_dict.keys()
+            #     if self.data.cell_line_to_idx_dict[k] in old_idx_to_new_idx.keys()
+            # }
+            # # Update ddi_edge_classes
+            # self.data.ddi_edge_classes = self.data.ddi_edge_classes.apply_(
+            #     lambda x: old_idx_to_new_idx[x]
+            # )
 
-        ##################################################################
-        # Update cell line index in case some cell lines have been removed
-        ##################################################################
-
-        new_unique_cell_lines = self.data.ddi_edge_classes.unique()
-        old_idx_to_new_idx = {
-            int(new_unique_cell_lines[i]): i for i in range(len(new_unique_cell_lines))
-        }
-        # Update cell_line_to_idxs dictionary
-        self.data.cell_line_to_idx_dict[0] = {
-            k: old_idx_to_new_idx[self.data.cell_line_to_idx_dict[0][k]]
-            for k in self.data.cell_line_to_idx_dict[0].keys()
-            if self.data.cell_line_to_idx_dict[0][k] in old_idx_to_new_idx.keys()
-        }
-        # Update ddi_edge_classes
-        self.data.ddi_edge_classes = self.data.ddi_edge_classes.apply_(
-            lambda x: old_idx_to_new_idx[x]
-        )
-
-        ##################################################################
-        # Log transform concentrations
-        ##################################################################
-
-        self.data.ddi_edge_conc_pair = torch.log(self.data.ddi_edge_conc_pair)
-        self.data.ddi_edge_conc_r = torch.log(self.data.ddi_edge_conc_r + 1e-6)
-        self.data.ddi_edge_conc_c = torch.log(self.data.ddi_edge_conc_c + 1e-6)
+        # Restrict to in house data or study data only if in_house_data is not "with"
+        if (self.in_house_data == "without") or (self.in_house_data == "in_house_only"):
+            if self.in_house_data == "without":
+                ixs = self.data.ddi_edge_in_house == 0
+            else:
+                ixs = self.data.ddi_edge_in_house == 1
+            for attr in dir(self.data):
+                if attr.startswith("ddi_edge_idx"):
+                    self.data[attr] = self.data[attr][:, ixs]
+                elif attr.startswith("ddi_edge_"):
+                    self.data[attr] = self.data[attr][ixs]
 
         print("Dataset loaded.")
         print(
-            "\t",
             self.data.ddi_edge_idx.shape[1],
             "drug comb experiments among",
             self.data.x_drugs.shape[0],
             "drugs",
         )
         print("\t fingeprints with radius", self.fp_radius, "and nbits", self.fp_bits)
-        print("\t", self.data.dpi_edge_idx.shape[1], "drug target interactions")
-        print("\t", int(self.data.ppi_edge_idx.shape[1] / 2), "prot-prot interactions")
         print("\t", "drug features dimension", self.data.x_drugs.shape[1])
-        print("\t", "protein features dimension", self.data.x_prots.shape[1])
         print("\t", len(set(self.data.ddi_edge_classes.numpy())), "cell-lines")
-        if self.use_l1000:
-            print("\t", "using differential gene expression")
-        else:
-            print("\t", "not using differential gene expression")
 
     @property
-    def raw_file_names(self):
-        return ["uniref50_v2/options.json", "uniref50_v2/weights.hdf5"]
-
-    def download(self):
-        download_url("https://rostlab.org/~deepppi/seqvec.zip", self.raw_dir)
-
-        with zipfile.ZipFile(
-            os.path.join(get_project_root(), "DrugComb/raw/seqvec.zip"), "r"
-        ) as zip_ref:
-            zip_ref.extractall(self.raw_dir)
+    def processed_paths(self):
+        return os.path.join(get_project_root(), "Drugcomb/")
 
     @property
-    def processed_file_names(self):
-        return ["drugcomb_matrix_data.pt"]
+    def processed_file_name(self):
+
+        proc_file_name = "drugcomb_matrix_data_" + \
+                         str(self.fp_bits) + "_" + \
+                         str(self.fp_radius) + "_" + \
+                         str(self.rounds_to_include)
+
+        return proc_file_name
+
+    def get_blocks(self):
+        blocks = rdl.get_specific_drug_combo_blocks(
+            data_set='DrugComb',
+            version=1.5,
+            study_name=self.study_name,
+        )["block_id"]
+
+        return blocks
 
     def process(self):
-        """
-        Processs the raw files to compute and save processed files
 
-        We restrict ourselves to pairwise combinations for which we have access to a 3x3 inhibition matrix,
-        along with 4 monotherapy inhibtions for each of the drugs. (only Almanac data)
-
-        This leaves us with 255049 examples corresponding to 4374 unique combos.
-
-        Note: only 4 cell lines in common between L1000 and
-            blocks with combo_measurements=9, mono_row_measurements=4, mono_col_measurements=4
-            Restricting ourselves to these 4 cell lines would leave us with only 17k examples in drugcomb
-            (instead of 255k)
-        """
+        print("Processing the dataset, only happens the first time.")
 
         ##################################################################
         # Load DrugComb dataframe
         ##################################################################
 
-        blocks = rsv.get_specific_drug_combo_blocks(
-            combo_measurements=9, mono_row_measurements=4, mono_col_measurements=4
+        blocks = self.get_blocks()
+
+        combo_data = rdl.get_drug_combo_data_combos(
+            block_ids=blocks,
+            data_set='DrugComb',
+            version=1.5
         )
 
-        mono_data = rsv.get_drug_combo_data_monos(block_ids=blocks["block_id"])
-        combo_data = rsv.get_drug_combo_data_combos(block_ids=blocks["block_id"])
-
-        data_df = pd.concat(
-            (
-                combo_data,
-                mono_data[["conc_r", "inhibition_r", "conc_c", "inhibition_c"]],
-            ),
-            axis=1,
-        )
-
-        ##################################################################
-        # Load L1000 dataframe
-        ##################################################################
-
-        if os.path.isfile(os.path.join(self.raw_dir, "processed_l1000.csv")):
-            # If the L1000 dataset has already been processed, load it
-            l1000_df = pd.read_csv(
-                os.path.join(self.raw_dir, "processed_l1000.csv"), index_col=0
-            ).astype(np.float32)
+        if len(self.rounds_to_include) == 0:
+            # If no rounds are included, we can add specific scores which are not provided in in house data
+            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
+                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max', 'synergy_bliss',
+                                     'css_ri']]
         else:
-            # Load L1000
-            l1000 = L1000()
+            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
+                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
 
-            # Load metadata
-            sig_info, landmark_gene_list = l1000.load_metadata()
-            expr_data = pd.concat(
-                [l1000.load_expr_data("phase1"), l1000.load_expr_data("phase2")],
-                sort=False,
-            )
+        combo_data['is_in_house'] = 0
 
-            # Concat with metadata
-            l1000_df = pd.concat((expr_data, sig_info), axis=1)
-            # Process L1000 dataset
-            l1000_df = process_l1000(l1000_df)
+        for round_id in self.rounds_to_include:
+            in_house_data = rdl.get_inhouse_data(project='oncology', experiment_round=round_id)
+            in_house_data = in_house_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
+                                           'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
+            in_house_data['is_in_house'] = 1
 
-            l1000_df.to_csv(os.path.join(self.raw_dir, "processed_l1000.csv"))
+            combo_data = pd.concat((combo_data, in_house_data))
 
         ##################################################################
         # Get node features and edges
         ##################################################################
 
         # Get nodes features
-        drug_nodes, protein_nodes, rec_id_to_idx_dict, is_drug = self._get_nodes(
-            data_df, l1000_df
-        )
+        drug_nodes, rec_id_to_idx_dict = self._get_nodes(combo_data)
 
-        # Process data_df
-        data_df, cell_lines = process_data(data_df, rec_id_to_idx_dict)
-
-        # Build edges
-        # PPI edges are both ways
-        ppi_edge_idx = self._get_ppi_edges(rec_id_to_idx_dict)
-        # DPI and DDI edges are one way only
-        dpi_edge_idx = self._get_dpi_edges(rec_id_to_idx_dict)
-
-        # DDI edges
-        (
-            ddi_edge_idx,
-            ddi_edge_classes,
-            ddi_edge_css,
-            ddi_edge_zip,
-            ddi_edge_bliss,
-            ddi_edge_loewe,
-            ddi_edge_hsa,
-            ddi_edge_conc_pair,
-            ddi_edge_inhibitions,
-            ddi_edge_conc_r,
-            ddi_edge_conc_c,
-            ddi_edge_inhibition_r,
-            ddi_edge_inhibition_c,
-            cell_line_to_idx_dict,
-        ) = self._get_ddi_edges(data_df)
-
-        # Fit sigmoids on monotherapy data and retieve fitted parameters
-        ddi_edge_sig_params_r = fit_sigmoid_on_monotherapies(
-            ddi_edge_conc_r,
-            ddi_edge_inhibition_r,
-            save_file="mono_sigm_params_r_"
-            + str(self.restrict_to_l1000_covered_drugs)
-            + ".npy",
-        )
-        ddi_edge_sig_params_c = fit_sigmoid_on_monotherapies(
-            ddi_edge_conc_c,
-            ddi_edge_inhibition_c,
-            save_file="mono_sigm_params_c_"
-            + str(self.restrict_to_l1000_covered_drugs)
-            + ".npy",
-        )
+        # Get combo experiments
+        ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_max, ddi_edge_bliss_av, ddi_edge_css_av, \
+        cell_line_to_idx_dict, cell_line_features, \
+        ddi_is_in_house = self._get_ddi_edges(combo_data, rec_id_to_idx_dict)
 
         ##################################################################
         # Create data object
         ##################################################################
 
         data = Data(
-            x_drugs=torch.tensor(drug_nodes.to_numpy(), dtype=torch.float),
-            x_prots=torch.tensor(protein_nodes.to_numpy(), dtype=torch.float),
+            x_drugs=torch.tensor(drug_nodes.to_numpy(), dtype=torch.float)
         )
 
-        # Add ppi attributes to data
-        data.ppi_edge_idx = torch.tensor(ppi_edge_idx, dtype=torch.long)
-        # Add dpi attributes to data
-        data.dpi_edge_idx = torch.tensor(dpi_edge_idx, dtype=torch.long)
         # Add ddi attributes to data
         data.ddi_edge_idx = torch.tensor(ddi_edge_idx, dtype=torch.long)
         data.ddi_edge_classes = torch.tensor(ddi_edge_classes, dtype=torch.long)
+        data.ddi_edge_in_house = torch.tensor(ddi_is_in_house, dtype=torch.long)
         data.cell_line_to_idx_dict = cell_line_to_idx_dict
+        data.rec_id_to_idx_dict = rec_id_to_idx_dict
+        data.cell_line_features = torch.tensor(cell_line_features, dtype=torch.float)
 
         # Scores
-        data.ddi_edge_css = torch.tensor(ddi_edge_css, dtype=torch.float)
-        data.ddi_edge_zip = torch.tensor(ddi_edge_zip, dtype=torch.float)
-        data.ddi_edge_bliss = torch.tensor(ddi_edge_bliss, dtype=torch.float)
-        data.ddi_edge_loewe = torch.tensor(ddi_edge_loewe, dtype=torch.float)
-        data.ddi_edge_hsa = torch.tensor(ddi_edge_hsa, dtype=torch.float)
-
-        # Raw data (combo)
-        data.ddi_edge_conc_pair = torch.tensor(ddi_edge_conc_pair, dtype=torch.float)
-        data.ddi_edge_inhibitions = torch.tensor(
-            ddi_edge_inhibitions, dtype=torch.float
-        )
-
-        # Raw data (monotherapy)
-        data.ddi_edge_conc_r = torch.tensor(ddi_edge_conc_r, dtype=torch.float)
-        data.ddi_edge_conc_c = torch.tensor(ddi_edge_conc_c, dtype=torch.float)
-        data.ddi_edge_inhibition_r = torch.tensor(
-            ddi_edge_inhibition_r, dtype=torch.float
-        )
-        data.ddi_edge_inhibition_c = torch.tensor(
-            ddi_edge_inhibition_c, dtype=torch.float
-        )
-
-        # Fitted params of sigmoids on monotherapy data
-        data.ddi_edge_sig_params_r = torch.tensor(
-            ddi_edge_sig_params_r, dtype=torch.float
-        )
-        data.ddi_edge_sig_params_c = torch.tensor(
-            ddi_edge_sig_params_c, dtype=torch.float
-        )
+        data.ddi_edge_bliss_max = torch.tensor(ddi_edge_bliss_max, dtype=torch.float)
+        data.ddi_edge_bliss_av = torch.tensor(ddi_edge_bliss_av, dtype=torch.float)
+        data.ddi_edge_css_av = torch.tensor(ddi_edge_css_av, dtype=torch.float)
 
         # Add attributes to data
         data.fp_radius = self.fp_radius
         data.fp_bits = self.fp_bits
-        data.ppi_graph = self.ppi_graph
-        data.dti_graph = self.dti_graph
-        data.use_l1000 = self.use_l1000
-        data.restrict_to_l1000_covered_drugs = self.restrict_to_l1000_covered_drugs
+        data.study_name = self.study_name
 
-        data.is_drug = torch.tensor(is_drug, dtype=torch.long)
+        torch.save(data, os.path.join(self.processed_paths, "processed", self.processed_file_name))
 
-        data_list = [data]
-        if self.pre_transform is not None:
-            data_list = self.pre_transform(data_list)
+        return data
 
-        data, slices = self.collate(data_list)
-        torch.save((data, slices), self.processed_paths[0])
+    def _get_nodes(self, combo_df):
 
-    def _get_nodes(self, data_df, l1000_df):
-        """
-        :param data_df: dataframe for the DrugComb dataset
-        :param l1000_df: dataframe for the (processed) L1000 dataset
-        :return:
-            - dataframe of drug features
-            - dataframe of protein features
-            - dictionary mapping RECOVER_ID to index of the node in the graph
-            - 1D numpy binary numpy array indicating which nodes are drugs (and which nodes are proteins)
-        """
-        # Drug nodes are duplicated (e.g. if several names of the same drug appear in drugcomb)
-        drug_nodes = get_drug_nodes(
-            data_df,
-            l1000_df,
-            self.dti_graph,
-            self.use_l1000,
-            self.restrict_to_l1000_covered_drugs,
-        )
-        protein_nodes = get_protein_nodes(self.raw_dir)
+        # Retrieve drugs that are not in the initial training set but that we want to add to the knowledge graph
+        additional_drugs_df = pd.read_csv(os.path.join(
+            rdl.RECOVER_DATA_FOLDER,
+            'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54.csv'
+        ))
 
-        ################################################################################################################
-        # Combine drug nodes and protein nodes together
-        ################################################################################################################
+        additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_relation_id",
+                                            'recover_id_drug2': "drug_col_relation_id",
+                                            'smiles_drug1': "drug_row_smiles",
+                                            'smiles_drug2': "drug_col_smiles"}, inplace=True)
 
-        all_nodes = pd.concat((drug_nodes, protein_nodes), sort=False)
-        all_nodes["recover_id"] = all_nodes.index
-        all_nodes.reset_index(drop=True, inplace=True)
+        all_nodes_df = pd.concat((additional_drugs_df, combo_df))
 
-        # Build dictionary recover ID -> node index
-        rec_id_to_idx_dict = {all_nodes.at[i, "recover_id"]: i for i in all_nodes.index}
-        is_drug = all_nodes[["is_drug"]].to_numpy()
+        # Get dataframe containing the smiles of all the drugs
+        row_smiles = all_nodes_df[["drug_row_relation_id", "drug_row_smiles"]]
+        col_smiles = all_nodes_df[["drug_col_relation_id", "drug_col_smiles"]]
+        row_smiles.columns = ["drug_recover_id", "smiles"]
+        col_smiles.columns = ["drug_recover_id", "smiles"]
 
-        # Computing fingerprints
+        drug_nodes = pd.concat((row_smiles, col_smiles))
+        drug_nodes = drug_nodes.drop_duplicates()
+
+        # Associate each drug with an index number
+        drug_nodes.reset_index(inplace=True, drop=True)
+        rec_id_to_idx_dict = {drug_nodes.at[i, "drug_recover_id"]: i for i in drug_nodes.index}
+
+        drug_nodes.set_index("drug_recover_id", inplace=True)
+
+        # Compute fingerprints
         idx_to_fp_dict = {
             idx: get_fingerprint(
-                all_nodes.at[idx, "smiles"], self.fp_radius, self.fp_bits
+                drug_nodes.at[idx, "smiles"], self.fp_radius, self.fp_bits
             )
-            for idx in all_nodes[all_nodes["is_drug"] == 1].index
+            for idx in drug_nodes.index
         }
 
-        drug_rec_ids = drug_nodes.index
-        drug_fps = pd.DataFrame.from_dict(idx_to_fp_dict, orient="index").set_index(
-            drug_rec_ids
-        )
+        drug_fps = pd.DataFrame.from_dict(idx_to_fp_dict, orient="index").set_index(drug_nodes.index)
         drug_fps.columns = ["fp_" + str(i) for i in range(self.fp_bits)]
 
-        # Add fingerprints
-        drug_nodes.drop(["smiles", "is_drug"], axis=1, inplace=True)
-        drug_nodes = pd.concat((drug_fps, drug_nodes), axis=1)
+        # Add a one hot encoding of drugs to the drug features
+        one_hot = pd.DataFrame(np.eye(len(drug_fps)), columns=["hot_" + str(i)
+                                                               for i in range(len(drug_fps))],
+                               dtype=int).set_index(drug_fps.index)
 
-        # Keep only relevant features
-        protein_nodes.drop("is_drug", axis=1, inplace=True)
+        drug_feat = pd.concat((drug_fps, one_hot), axis=1)
 
-        return drug_nodes, protein_nodes, rec_id_to_idx_dict, is_drug
+        return drug_feat, rec_id_to_idx_dict
 
-    def _get_ppi_edges(self, rec_id_to_idx_dict):
-        return get_ppi_edges(rec_id_to_idx_dict, self.ppi_graph)
+    def _do_pca(self, df):
+        n_components = df.shape[0] - 1
+        pca = PCA(n_components=n_components)
 
-    def _get_dpi_edges(self, rec_id_to_idx_dict):
-        return get_dpi_edges(rec_id_to_idx_dict, self.dti_graph)
+        transformed = pca.fit_transform(df.to_numpy())
 
-    def _get_ddi_edges(self, data_df):
-        return get_ddi_edges(data_df)
+        # Normalize each feature between -1 and 1
+        mins = transformed.min(axis=0)
+        maxs = transformed.max(axis=0)
 
-    def random_split(self, test_prob, valid_prob, level="drug"):
-        """
-        :param level: Two options, "drug" and "pair". Specify whether the split is performed at the drug level (i.e.
-            drugs are assigned to a split, and we only consider combinations of drugs which are in the same split), or
-            at the drug pair level (i.e. all examples corresponding to a given combination of drugs are assigned to the
-            same split, regardless of cell line)
-        :return: 3 tensors containing indices of train, valid and test drug-drug edges
-        """
-        assert level in ["drug", "pair"]
+        transformed -= mins
+        transformed /= ((maxs - mins) / 2)
+        transformed -= 1
 
-        if level == "drug":
-            return drug_level_random_split(test_prob, valid_prob, self.data)
+        return transformed
+
+    def _transform_cell_line_metadata_df(self, df):
+        to_concat = []
+        df.drop('Unnamed: 0', axis=1, inplace=True)
+        for col in df.columns:
+            this_res = None
+            srs = df[col]
+
+            if is_numeric_dtype(srs):
+                srs = srs.fillna(srs.mean())
+                this_res = srs
+            elif is_string_dtype(srs):
+                this_res = pd.get_dummies(srs, dummy_na=True)
+
+            to_concat.append(this_res)
+
+        return pd.concat(to_concat, axis=1).to_numpy()
+
+    def _get_ddi_edges(self, data_df, rec_id_to_idx_dict):
+
+        # Add drug index information to the df
+        data_df["drug_row_idx"] = data_df['drug_row_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
+        data_df["drug_col_idx"] = data_df['drug_col_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
+
+        # Get list of cell lines
+        cell_line_list = list(data_df["cell_line_name"].unique())
+        cell_line_list.sort()
+
+        # Retrieve cell line features
+        gene_expr, gene_mutation, gene_cn, metadata = rdl.get_cell_line_features(cell_line_list)
+
+        to_concat = [self._do_pca(df) for df in (gene_expr, gene_mutation, gene_cn)]
+        to_concat.append(self._transform_cell_line_metadata_df(metadata))
+
+        cell_line_features = np.concatenate(to_concat, axis=1)
+
+        # Restrict to cell lines with features
+        cell_line_list = list(gene_expr.index)
+        data_df = data_df[data_df['cell_line_name'].apply(lambda cl: cl in cell_line_list)]
+
+        # Get cell line dictionary
+        cell_line_to_idx_dict = dict((v, k) for k, v in enumerate(cell_line_list))
+
+        # Add categorical encoding of cell lines
+        data_df = copy.deepcopy(data_df)  # To avoid pandas issue
+        data_df["cell_line_cat"] = data_df["cell_line_name"].apply(lambda c: cell_line_to_idx_dict[c])
+
+        # Drug indices of combos
+        ddi_edge_idx = data_df[["drug_row_idx", "drug_col_idx"]].to_numpy().T
+        # Cell lines
+        ddi_edge_classes = data_df["cell_line_cat"].to_numpy()
+        # Scores
+        ddi_edge_bliss_max = data_df['synergy_bliss_max'].to_numpy()
+        ddi_edge_bliss_av = data_df['synergy_bliss'].to_numpy()
+        ddi_edge_css_av = data_df['css_ri'].to_numpy()
+
+        # Is in house
+        ddi_is_in_house = data_df['is_in_house'].to_numpy()
+
+        return ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_max, ddi_edge_bliss_av, ddi_edge_css_av, \
+               cell_line_to_idx_dict, cell_line_features, ddi_is_in_house
+
+    def random_split(self, config):
+
+        test_on_unseen_cell_line = config["test_on_unseen_cell_line"]
+        split_valid_train_level = config["split_valid_train"]
+
+        assert split_valid_train_level in ["cell_line_level", "pair_level"]
+
+        valid_prob, test_prob = config["val_set_prop"], config["test_set_prop"]
+
+        if test_on_unseen_cell_line:
+
+            ##################################################################
+            # Split s.t. test is a set of cell lines which do not appear in train and valid
+            ##################################################################
+
+            assert config["cell_line"] is None
+            assert len(config["cell_lines_in_test"]) > 0
+
+            test_cell_line_idxs = [self.data.cell_line_to_idx_dict[cl_name] for cl_name in config["cell_lines_in_test"]]
+
+            test_idx = []
+            for cl_idx in test_cell_line_idxs:
+                cl_idxs = np.where(self.data.ddi_edge_classes.to('cpu') == cl_idx)[0].tolist()
+                test_idx.extend(cl_idxs)
+
+            valid_train_cell_line_idxs = list(set(self.data.cell_line_to_idx_dict.values()) -
+                                              set(test_cell_line_idxs))
+
+            test_idx = np.array(test_idx)
+
+            if split_valid_train_level == "cell_line_level":
+
+                # Get number of cell lines in valid
+                nvalid = int(len(valid_train_cell_line_idxs) * valid_prob)
+
+                # Shuffle train_valid cell line indices
+                valid_train_cell_line_idxs = \
+                    torch.tensor(valid_train_cell_line_idxs)[torch.randperm(len(valid_train_cell_line_idxs))]
+
+                # Assign cell lines to either valid or train
+                train_cell_line_idxs = valid_train_cell_line_idxs[nvalid:]
+                valid_cell_line_idxs = valid_train_cell_line_idxs[:nvalid]
+
+                train_idx = []
+                for cl_idx in train_cell_line_idxs:
+                    cl_idxs = np.where(self.data.ddi_edge_classes.to('cpu') == cl_idx)[0].tolist()
+                    train_idx.extend(cl_idxs)
+                valid_idx = []
+                for cl_idx in valid_cell_line_idxs:
+                    cl_idxs = np.where(self.data.ddi_edge_classes.to('cpu') == cl_idx)[0].tolist()
+                    valid_idx.extend(cl_idxs)
+
+                train_idx = np.array(train_idx)
+                valid_idx = np.array(valid_idx)
+
+            else:
+
+                ##################################################################
+                # Split train valid at the pair level
+                ##################################################################
+
+                # Get all valid train indices
+                valid_train_idx = []
+                for cl_idx in valid_train_cell_line_idxs:
+                    cl_idxs = np.where(self.data.ddi_edge_classes.to('cpu') == cl_idx)[0].tolist()
+                    valid_train_idx.extend(cl_idxs)
+
+                # Get unique edges (one for each drug pair, regardless of cell line) which appear in valid_train combos
+                unique_train_valid_ddi_edge_idx = self.data.ddi_edge_idx[:, valid_train_idx].unique(dim=1)
+                num_unique_examples = unique_train_valid_ddi_edge_idx.shape[1]
+
+                # Number of unique edges in valid
+                nvalid = int(num_unique_examples * valid_prob)
+
+                # Shuffle train and valid unique indices with current seed
+                unique_train_valid_idx = torch.randperm(unique_train_valid_ddi_edge_idx.shape[1])
+
+                # Get train and valid
+                unique_valid_idx = unique_train_valid_idx[:nvalid]
+                unique_train_idx = unique_train_valid_idx[nvalid:]
+
+                # Dictionary that associate each unique edge with a split (train: 0, valid: 1)
+                edge_to_split_dict = {
+                    **{tuple(unique_train_valid_ddi_edge_idx.T[i].tolist()): 0 for i in unique_train_idx},
+                    **{tuple(unique_train_valid_ddi_edge_idx.T[i].tolist()): 1 for i in unique_valid_idx},
+                }
+
+                # Associate each (non unique) edges with a split
+                all_edges_split = []
+                for edge in self.data.ddi_edge_idx.T:
+                    try:
+                        all_edges_split.append(edge_to_split_dict[tuple(edge.tolist())])
+                    except KeyError:
+                        all_edges_split.append(-1)
+                all_edges_split = np.array(all_edges_split)
+
+                # Discard edges that are already in the test
+                all_edges_split[test_idx] = -1
+
+                # Get train/valid indices for all (non unique) edges
+                train_idx = np.where(all_edges_split == 0)[0]
+                valid_idx = np.where(all_edges_split == 1)[0]
+
         else:
-            return pair_level_random_split(test_prob, valid_prob, self.data)
+
+            ##################################################################
+            # Split everything at the pair level
+            ##################################################################
+
+            assert config["split_valid_train"] == "pair_level", "if not testing on separate cell lines, " \
+                                                                "split level must be on the pair level"
+
+            # Get unique edges (one for each drug pair, regardless of cell line)
+            unique_ddi_edge_idx = self.data.ddi_edge_idx.unique(dim=1)
+            num_unique_examples = unique_ddi_edge_idx.shape[1]
+
+            # Number of unique edges for each of the splits
+            nvalid = int(num_unique_examples * valid_prob)
+            ntest = int(num_unique_examples * test_prob)
+
+            # Shuffle with seed 0
+            shuflled_idx = np.arange(num_unique_examples)
+            random.Random(0).shuffle(shuflled_idx)
+
+            unique_test_idx = shuflled_idx[
+                              :ntest
+                              ]  # Fixed test set (does not depend on the seed)
+
+            unique_train_valid_idx = shuflled_idx[ntest:]  # Train and valid sets
+            # Shuffle train and valid with current seed
+            unique_train_valid_idx = unique_train_valid_idx[
+                torch.randperm(len(unique_train_valid_idx))
+            ]
+            # Get train and valid
+            unique_valid_idx = unique_train_valid_idx[:nvalid]
+            unique_train_idx = unique_train_valid_idx[nvalid:]
+
+            # Dictionary that associate each unique edge with a split (train: 0, valid: 1, test: 2)
+            edge_to_split_dict = {
+                **{tuple(unique_ddi_edge_idx.T[i].tolist()): 0 for i in unique_train_idx},
+                **{tuple(unique_ddi_edge_idx.T[i].tolist()): 1 for i in unique_valid_idx},
+                **{tuple(unique_ddi_edge_idx.T[i].tolist()): 2 for i in unique_test_idx},
+            }
+
+            # Associate each (non unique) edges with a split
+            all_edges_split = np.array(
+                [edge_to_split_dict[tuple(edge.tolist())] for edge in self.data.ddi_edge_idx.T]
+            )
+
+            # Get train/valid/test indices for all (non unique) edges
+            train_idx = np.where(all_edges_split == 0)[0]
+            valid_idx = np.where(all_edges_split == 1)[0]
+            test_idx = np.where(all_edges_split == 2)[0]
+
+        # Shuffle the order within each split
+        np.random.shuffle(train_idx)
+        np.random.shuffle(valid_idx)
+        np.random.shuffle(test_idx)
+
+        return torch.tensor(train_idx, dtype=torch.long), \
+               torch.tensor(valid_idx, dtype=torch.long), \
+               torch.tensor(test_idx, dtype=torch.long)
 
 
-class DrugCombMatrixNoPPI(DrugCombMatrix):
-    def __init__(
-        self,
-        transform=None,
-        pre_transform=None,
-        fp_bits=1024,
-        fp_radius=4,
-        ppi_graph="huri.csv",
-        dti_graph="chembl_dtis.csv",
-        cell_line=None,
-        use_l1000=False,
-        restrict_to_l1000_covered_drugs=False,
-    ):
-        """
-        Version of the dataset which do not include Protein-Protein information
-        """
-        super().__init__(
-            transform,
-            pre_transform,
-            fp_bits,
-            fp_radius,
-            ppi_graph,
-            dti_graph,
-            cell_line,
-            use_l1000,
-            restrict_to_l1000_covered_drugs,
-        )
+########################################################################################################################
+# Dataset objects where some drug features are removed
+########################################################################################################################
 
-    def process(self):
-        super().process()
 
-    def download(self):
-        super().download()
+class DrugCombMatrixNoFP(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        self.data.x_drugs[:, :self.fp_bits] = 0
+
+
+class DrugCombMatrixNoOneHot(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        self.data.x_drugs[:, self.fp_bits:] = 0
+
+
+########################################################################################################################
+# Dataset objects for transfer study
+########################################################################################################################
+
+
+class DrugCombMatrixTrainOneil(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ONEIL",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        assert study_name == "ONEIL"
+        assert in_house_data == "without"
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        print("keep only fingerprint features")
+        self.data.x_drugs = self.data.x_drugs[:, :self.fp_bits]
 
     @property
-    def processed_file_names(self):
-        return ["drugcomb_matrix_data_no_ppi.pt"]
+    def processed_file_name(self):
 
-    def _get_ppi_edges(self, rec_id_to_idx_dict):
-        return np.empty([2, 0])
+        proc_file_name = "drugcomb_matrix_data_trainOneil_" + \
+                         str(self.fp_bits) + "_" + \
+                         str(self.fp_radius) + "_" + \
+                         str(self.rounds_to_include)
+
+        return proc_file_name
+
+    def get_blocks(self):
+
+        all_splits = pd.read_pickle(os.path.join(
+            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+        )
+        )
+
+        all_splits = all_splits[all_splits["overlap"] == "divided"]
+        all_splits = all_splits[all_splits["type"] == "train"]
+        all_splits = all_splits[all_splits["cell_line"] == "all_overlapping"]
+        all_splits = all_splits[all_splits["study_train"] == "ONEIL"]
+        all_splits = all_splits[all_splits["study_predict"] == "ALMANAC"]
+
+        all_splits = all_splits[all_splits["trim"] == "not_trimmed"]
+        assert len(all_splits) == 1
+        block_ids = all_splits["block_ids"].item()
+
+        blocks = pd.Series(block_ids)
+
+        return blocks
+
+
+class DrugCombMatrixTestAlmanac(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        assert study_name == "ALMANAC"
+        assert in_house_data == "without"
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        print("keep only fingerprint features")
+        self.data.x_drugs = self.data.x_drugs[:, :self.fp_bits]
+
+    @property
+    def processed_file_name(self):
+
+        proc_file_name = "drugcomb_matrix_data_testAlmanac_" + \
+                         str(self.fp_bits) + "_" + \
+                         str(self.fp_radius) + "_" + \
+                         str(self.rounds_to_include)
+
+        return proc_file_name
+
+    def get_blocks(self):
+        all_splits = pd.read_pickle(os.path.join(
+            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+        )
+        )
+
+        all_splits = all_splits[all_splits["overlap"] == "divided"]
+        all_splits = all_splits[all_splits["type"] == "test"]
+        all_splits = all_splits[all_splits["cell_line"] == "all_overlapping"]
+        all_splits = all_splits[all_splits["study_train"] == "ONEIL"]
+        all_splits = all_splits[all_splits["study_predict"] == "ALMANAC"]
+
+        assert len(all_splits) == 1
+        block_ids = all_splits["block_ids"].item()
+
+        blocks = pd.Series(block_ids)
+
+        return blocks
+
+
+class DrugCombMatrixTrainAlmanac(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        assert study_name == "ALMANAC"
+        assert in_house_data == "without"
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        print("keep only fingerprint features")
+        self.data.x_drugs = self.data.x_drugs[:, :self.fp_bits]
+
+    @property
+    def processed_file_name(self):
+
+        proc_file_name = "drugcomb_matrix_data_trainAlmanac_" + \
+                         str(self.fp_bits) + "_" + \
+                         str(self.fp_radius) + "_" + \
+                         str(self.rounds_to_include)
+
+        return proc_file_name
+
+    def get_blocks(self):
+        all_splits = pd.read_pickle(os.path.join(
+            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+        )
+        )
+
+        all_splits = all_splits[all_splits["overlap"] == "divided"]
+        all_splits = all_splits[all_splits["type"] == "train"]
+        all_splits = all_splits[all_splits["cell_line"] == "all_overlapping"]
+        all_splits = all_splits[all_splits["study_train"] == "ALMANAC"]
+        all_splits = all_splits[all_splits["study_predict"] == "ONEIL"]
+
+        all_splits = all_splits[all_splits["trim"] == "trimmed"]
+
+        assert len(all_splits) == 1
+        block_ids = all_splits["block_ids"].item()
+
+        blocks = pd.Series(block_ids)
+
+        return blocks
+
+
+########################################################################################################################
+# Dataset objects with various numbers of unique drugs
+########################################################################################################################
+
+
+class DrugCombMatrixRemoveHalfDrugs(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+
+        to_be_removed_drug_prop = 0.5
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        to_be_removed_drug_idxs = all_drug_idxs[:int(to_be_removed_drug_prop*len(all_drug_idxs))]
+
+        to_be_removed_ixs = []
+        for i in range(len(to_be_removed_drug_idxs)):
+            to_be_removed_ixs += list(np.where(self.data.ddi_edge_idx == to_be_removed_drug_idxs[i])[1])
+
+        # Indices to keep
+        ixs = list(set(range(self.data.ddi_edge_idx.shape[1])) - set(np.unique(to_be_removed_ixs)))
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
+class DrugCombMatrixRemoveOneFourthfDrugs(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+
+        to_be_removed_drug_prop = 0.25
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        to_be_removed_drug_idxs = all_drug_idxs[:int(to_be_removed_drug_prop*len(all_drug_idxs))]
+
+        to_be_removed_ixs = []
+        for i in range(len(to_be_removed_drug_idxs)):
+            to_be_removed_ixs += list(np.where(self.data.ddi_edge_idx == to_be_removed_drug_idxs[i])[1])
+
+        # Indices to keep
+        ixs = list(set(range(self.data.ddi_edge_idx.shape[1])) - set(np.unique(to_be_removed_ixs)))
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
+########################################################################################################################
+# Dataset objects for drug level split
+########################################################################################################################
+
+
+class DrugCombMatrixDrugLevelSplitTrain(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        self.data.x_drugs[:, self.fp_bits:] = 0
+
+        propr_drug_in_test = 0.3
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        test_drug_idxs = all_drug_idxs[:int(propr_drug_in_test*len(all_drug_idxs))]
+
+        test_ixs = []
+        for i in range(len(test_drug_idxs)):
+            test_ixs += list(np.where(self.data.ddi_edge_idx == test_drug_idxs[i])[1])
+
+        # Indices to keep
+        ixs = list(set(range(self.data.ddi_edge_idx.shape[1])) - set(np.unique(test_ixs)))
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
+class DrugCombMatrixDrugLevelSplitTest(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        self.data.x_drugs[:, self.fp_bits:] = 0
+
+        # "To be removed" drugs are kept for the test
+        propr_drug_in_test = 0.3
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        trainval_drug_idxs = all_drug_idxs[int(propr_drug_in_test*len(all_drug_idxs)):]
+
+        trainval_ixs = []
+        for i in range(len(trainval_drug_idxs)):
+            trainval_ixs += list(np.where(self.data.ddi_edge_idx == trainval_drug_idxs[i])[1])
+
+        # Indices to keep
+        ixs = list(set(range(self.data.ddi_edge_idx.shape[1])) - set(np.unique(trainval_ixs)))
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
 
 
 if __name__ == "__main__":
-    dataset = DrugCombMatrix(
-        fp_bits=1024, fp_radius=4, use_l1000=True, restrict_to_l1000_covered_drugs=True
+
+    dataset = DrugCombMatrixTrainOneil(
+        in_house_data='without',
+        rounds_to_include=[],
+        cell_line=None,
+        fp_bits=1024,
+        fp_radius=2
     )
+
+    print(dataset.data.cell_line_to_idx_dict)
+
+    dataset = DrugCombMatrixTrainAlmanac(
+        in_house_data='without',
+        rounds_to_include=[],
+        cell_line=None,
+        fp_bits=1024,
+        fp_radius=2
+    )
+
+    print(dataset.data.cell_line_to_idx_dict)
