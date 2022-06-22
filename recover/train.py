@@ -115,7 +115,7 @@ class BasicTrainer(tune.Trainable):
             cell_line=config["cell_line"],
             study_name=config["study_name"],
             in_house_data=config["in_house_data"],
-            rounds_to_include=config["rounds_to_include"],
+            rounds_to_include=config.get("rounds_to_include", []),
         )
 
         self.data = dataset.data.to(self.device)

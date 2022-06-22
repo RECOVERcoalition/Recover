@@ -386,7 +386,7 @@ class DrugCombMatrix:
 
     def random_split(self, config):
 
-        test_on_unseen_cell_line = config["test_on_unseen_cell_line"]
+        test_on_unseen_cell_line = config.get("test_on_unseen_cell_line", False)
         split_valid_train_level = config["split_valid_train"]
 
         assert split_valid_train_level in ["cell_line_level", "pair_level"]
