@@ -4,7 +4,7 @@ import torch
 import os
 import random
 import copy
-import reservoir as rdl
+import recover_data_lake as rdl
 from sklearn.decomposition import PCA
 from pandas.api.types import is_string_dtype, is_numeric_dtype
 from pathlib import Path
@@ -212,6 +212,10 @@ class DrugCombMatrix:
             in_house_data = in_house_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
                                            'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
             in_house_data['is_in_house'] = 1
+
+            # Add scores that are not included in in_house_data
+            in_house_data['css_ri'] = 0
+            in_house_data['synergy_bliss'] = 0
 
             combo_data = pd.concat((combo_data, in_house_data))
 
