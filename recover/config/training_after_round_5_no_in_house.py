@@ -46,8 +46,8 @@ model_config = {
 dataset_config = {
     "dataset": DrugCombMatrix,
     "study_name": 'ALMANAC',
-    "in_house_data": 'with',
-    "rounds_to_include": [1, 2, 3, 4, 5],
+    "in_house_data": 'without',
+    "rounds_to_include": [],
     "val_set_prop": 0.2,
     "test_set_prop": 0.1,
     "test_on_unseen_cell_line": False,
