@@ -4,7 +4,7 @@ import torch
 import os
 import random
 import copy
-import recover_data_lake as rdl
+import reservoir as rsv
 from sklearn.decomposition import PCA
 from pandas.api.types import is_string_dtype, is_numeric_dtype
 from pathlib import Path
@@ -172,7 +172,7 @@ class DrugCombMatrix:
         return proc_file_name
 
     def get_blocks(self):
-        blocks = rdl.get_specific_drug_combo_blocks(
+        blocks = rsv.get_specific_drug_combo_blocks(
             data_set='DrugComb',
             version=1.5,
             study_name=self.study_name,
@@ -190,7 +190,7 @@ class DrugCombMatrix:
 
         blocks = self.get_blocks()
 
-        combo_data = rdl.get_drug_combo_data_combos(
+        combo_data = rsv.get_drug_combo_data_combos(
             block_ids=blocks,
             data_set='DrugComb',
             version=1.5
@@ -208,7 +208,7 @@ class DrugCombMatrix:
         combo_data['is_in_house'] = 0
 
         for round_id in self.rounds_to_include:
-            in_house_data = rdl.get_inhouse_data(project='oncology', experiment_round=round_id)
+            in_house_data = rsv.get_inhouse_data(project='oncology', experiment_round=round_id)
             in_house_data = in_house_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
                                            'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
             in_house_data['is_in_house'] = 1
@@ -265,7 +265,7 @@ class DrugCombMatrix:
 
         # Retrieve drugs that are not in the initial training set but that we want to add to the knowledge graph
         additional_drugs_df = pd.read_csv(os.path.join(
-            rdl.RECOVER_DATA_FOLDER,
+            rsv.RECOVER_DATA_FOLDER,
             'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54.csv'
         ))
 
@@ -355,7 +355,7 @@ class DrugCombMatrix:
         cell_line_list.sort()
 
         # Retrieve cell line features
-        gene_expr, gene_mutation, gene_cn, metadata = rdl.get_cell_line_features(cell_line_list)
+        gene_expr, gene_mutation, gene_cn, metadata = rsv.get_cell_line_features(cell_line_list)
 
         to_concat = [self._do_pca(df) for df in (gene_expr, gene_mutation, gene_cn)]
         to_concat.append(self._transform_cell_line_metadata_df(metadata))
@@ -613,7 +613,7 @@ class DrugCombMatrixTrainOneil(DrugCombMatrix):
     def get_blocks(self):
 
         all_splits = pd.read_pickle(os.path.join(
-            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
@@ -658,7 +658,7 @@ class DrugCombMatrixTestAlmanac(DrugCombMatrix):
 
     def get_blocks(self):
         all_splits = pd.read_pickle(os.path.join(
-            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
@@ -702,7 +702,7 @@ class DrugCombMatrixTrainAlmanac(DrugCombMatrix):
 
     def get_blocks(self):
         all_splits = pd.read_pickle(os.path.join(
-            rdl.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
