@@ -17,9 +17,9 @@ pip install -e .
 # Install rdkit
 conda install -c rdkit rdkit
 
-# Get Recover-Data-Lake and install it in the environment (Git LFS NEEDED)
-git clone git@github.com:RECOVERcoalition/Recover-Data-Lake.git
-cd Recover-Data-Lake/
+# Get Reservoir and install it in the environment (Git LFS NEEDED)
+git clone git@github.com:RECOVERcoalition/Reservoir.git
+cd Reservoir/
 python setup.py develop
 cd ../
 
