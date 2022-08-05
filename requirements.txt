@@ -2,7 +2,8 @@ jupyter==1.0.0
 ipython>=7.16.3
 matplotlib==3.2.2
 seaborn==0.11.0
-pytorch==1.10.2
+# not installing pytorch from here
+# pytorch=1.10.2
 tqdm
 scikit-learn==0.23.2
 pip
