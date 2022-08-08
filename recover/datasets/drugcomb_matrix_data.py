@@ -265,7 +265,7 @@ class DrugCombMatrix:
 
         # Retrieve drugs that are not in the initial training set but that we want to add to the knowledge graph
         additional_drugs_df = pd.read_csv(os.path.join(
-            rsv.RECOVER_DATA_FOLDER,
+            rsv.RESERVOIR_DATA_FOLDER,
             'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54.csv'
         ))
 
@@ -658,7 +658,7 @@ class DrugCombMatrixTestAlmanac(DrugCombMatrix):
 
     def get_blocks(self):
         all_splits = pd.read_pickle(os.path.join(
-            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RESERVOIR_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
@@ -702,7 +702,7 @@ class DrugCombMatrixTrainAlmanac(DrugCombMatrix):
 
     def get_blocks(self):
         all_splits = pd.read_pickle(os.path.join(
-            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RESERVOIR_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
