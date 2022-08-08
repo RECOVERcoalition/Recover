@@ -123,7 +123,7 @@ class BasicTrainer(tune.Trainable):
         # If a score is the target, we store it in the ddi_edge_response attribute of the data object
         if "target" in config.keys():
             possible_target_dicts = {
-                "bliss_max": self.data.ddi_edge_bliss_max,
+                # "bliss_max": self.data.ddi_edge_bliss_max,
                 "bliss_av": self.data.ddi_edge_bliss_av,
                 "css_av": self.data.ddi_edge_css_av,
             }

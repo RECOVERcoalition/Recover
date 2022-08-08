@@ -174,7 +174,7 @@ class DrugCombMatrix:
     def get_blocks(self):
         blocks = rsv.get_specific_drug_combo_blocks(
             data_set='DrugComb',
-            version=1.5,
+            # version=1.5,
             study_name=self.study_name,
         )["block_id"]
 
@@ -192,25 +192,25 @@ class DrugCombMatrix:
 
         combo_data = rsv.get_drug_combo_data_combos(
             block_ids=blocks,
-            data_set='DrugComb',
-            version=1.5
+            # data_set='DrugComb',
+            # version=1.5
         )
 
         if len(self.rounds_to_include) == 0:
             # If no rounds are included, we can add specific scores which are not provided in in house data
-            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max', 'synergy_bliss',
+            combo_data = combo_data[['cell_line_name', 'drug_row_recover_id', 'drug_row_smiles',
+                                     'drug_col_recover_id', 'drug_col_smiles', 'synergy_bliss',
                                      'css_ri']]
         else:
-            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
+            combo_data = combo_data[['cell_line_name', 'drug_row_recover_id', 'drug_row_smiles',
+                                     'drug_col_recover_id', 'drug_col_smiles']]
 
         combo_data['is_in_house'] = 0
 
         for round_id in self.rounds_to_include:
             in_house_data = rsv.get_inhouse_data(project='oncology', experiment_round=round_id)
             in_house_data = in_house_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                           'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
+                                           'drug_col_relation_id', 'drug_col_smiles']]
             in_house_data['is_in_house'] = 1
 
             # Add scores that are not included in in_house_data
@@ -227,8 +227,8 @@ class DrugCombMatrix:
         drug_nodes, rec_id_to_idx_dict = self._get_nodes(combo_data)
 
         # Get combo experiments
-        ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_max, ddi_edge_bliss_av, ddi_edge_css_av, \
-        cell_line_to_idx_dict, cell_line_features, \
+        ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_av, ddi_edge_css_av, \
+        cell_line_to_idx_dict, \
         ddi_is_in_house = self._get_ddi_edges(combo_data, rec_id_to_idx_dict)
 
         ##################################################################
@@ -245,10 +245,10 @@ class DrugCombMatrix:
         data.ddi_edge_in_house = torch.tensor(ddi_is_in_house, dtype=torch.long)
         data.cell_line_to_idx_dict = cell_line_to_idx_dict
         data.rec_id_to_idx_dict = rec_id_to_idx_dict
-        data.cell_line_features = torch.tensor(cell_line_features, dtype=torch.float)
+        # data.cell_line_features = torch.tensor(cell_line_features, dtype=torch.float)
 
         # Scores
-        data.ddi_edge_bliss_max = torch.tensor(ddi_edge_bliss_max, dtype=torch.float)
+        # data.ddi_edge_bliss_max = torch.tensor(ddi_edge_bliss_max, dtype=torch.float)
         data.ddi_edge_bliss_av = torch.tensor(ddi_edge_bliss_av, dtype=torch.float)
         data.ddi_edge_css_av = torch.tensor(ddi_edge_css_av, dtype=torch.float)
 
@@ -266,19 +266,19 @@ class DrugCombMatrix:
         # Retrieve drugs that are not in the initial training set but that we want to add to the knowledge graph
         additional_drugs_df = pd.read_csv(os.path.join(
             rsv.RESERVOIR_DATA_FOLDER,
-            'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54.csv'
+            'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54_withReplacements.csv'
         ))
 
-        additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_relation_id",
-                                            'recover_id_drug2': "drug_col_relation_id",
+        additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_recover_id",
+                                            'recover_id_drug2': "drug_col_recover_id",
                                             'smiles_drug1': "drug_row_smiles",
                                             'smiles_drug2': "drug_col_smiles"}, inplace=True)
 
         all_nodes_df = pd.concat((additional_drugs_df, combo_df))
 
         # Get dataframe containing the smiles of all the drugs
-        row_smiles = all_nodes_df[["drug_row_relation_id", "drug_row_smiles"]]
-        col_smiles = all_nodes_df[["drug_col_relation_id", "drug_col_smiles"]]
+        row_smiles = all_nodes_df[["drug_row_recover_id", "drug_row_smiles"]]
+        col_smiles = all_nodes_df[["drug_col_recover_id", "drug_col_smiles"]]
         row_smiles.columns = ["drug_recover_id", "smiles"]
         col_smiles.columns = ["drug_recover_id", "smiles"]
 
@@ -347,24 +347,24 @@ class DrugCombMatrix:
     def _get_ddi_edges(self, data_df, rec_id_to_idx_dict):
 
         # Add drug index information to the df
-        data_df["drug_row_idx"] = data_df['drug_row_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
-        data_df["drug_col_idx"] = data_df['drug_col_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
+        data_df["drug_row_idx"] = data_df['drug_row_recover_id'].apply(lambda id: rec_id_to_idx_dict[id])
+        data_df["drug_col_idx"] = data_df['drug_col_recover_id'].apply(lambda id: rec_id_to_idx_dict[id])
 
         # Get list of cell lines
         cell_line_list = list(data_df["cell_line_name"].unique())
         cell_line_list.sort()
 
         # Retrieve cell line features
-        gene_expr, gene_mutation, gene_cn, metadata = rsv.get_cell_line_features(cell_line_list)
+        # gene_expr, gene_mutation, gene_cn, metadata = rsv.get_cell_line_features(cell_line_list)
 
-        to_concat = [self._do_pca(df) for df in (gene_expr, gene_mutation, gene_cn)]
-        to_concat.append(self._transform_cell_line_metadata_df(metadata))
+        # to_concat = [self._do_pca(df) for df in (gene_expr, gene_mutation, gene_cn)]
+        # to_concat.append(self._transform_cell_line_metadata_df(metadata))
 
-        cell_line_features = np.concatenate(to_concat, axis=1)
+        # cell_line_features = np.concatenate(to_concat, axis=1)
 
         # Restrict to cell lines with features
-        cell_line_list = list(gene_expr.index)
-        data_df = data_df[data_df['cell_line_name'].apply(lambda cl: cl in cell_line_list)]
+        # cell_line_list = list(gene_expr.index)
+        # data_df = data_df[data_df['cell_line_name'].apply(lambda cl: cl in cell_line_list)]
 
         # Get cell line dictionary
         cell_line_to_idx_dict = dict((v, k) for k, v in enumerate(cell_line_list))
@@ -378,15 +378,15 @@ class DrugCombMatrix:
         # Cell lines
         ddi_edge_classes = data_df["cell_line_cat"].to_numpy()
         # Scores
-        ddi_edge_bliss_max = data_df['synergy_bliss_max'].to_numpy()
+        # ddi_edge_bliss_max = data_df['synergy_bliss_max'].to_numpy()
         ddi_edge_bliss_av = data_df['synergy_bliss'].to_numpy()
         ddi_edge_css_av = data_df['css_ri'].to_numpy()
 
         # Is in house
         ddi_is_in_house = data_df['is_in_house'].to_numpy()
 
-        return ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_max, ddi_edge_bliss_av, ddi_edge_css_av, \
-               cell_line_to_idx_dict, cell_line_features, ddi_is_in_house
+        return ddi_edge_idx, ddi_edge_classes, ddi_edge_bliss_av, ddi_edge_css_av, \
+               cell_line_to_idx_dict, ddi_is_in_house
 
     def random_split(self, config):
 

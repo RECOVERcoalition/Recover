@@ -54,7 +54,7 @@ dataset_config = {
     "test_on_unseen_cell_line": False,
     "split_valid_train": "pair_level",
     "cell_line": None,  # 'PC-3',
-    "target": "bliss_max",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
+    "target": "bliss_av",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
     "fp_bits": 1024,
     "fp_radius": 2
 }
