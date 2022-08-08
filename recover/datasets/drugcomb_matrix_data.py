@@ -613,7 +613,7 @@ class DrugCombMatrixTrainOneil(DrugCombMatrix):
     def get_blocks(self):
 
         all_splits = pd.read_pickle(os.path.join(
-            rsv.RECOVER_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
+            rsv.RESERVOIR_DATA_FOLDER, 'parsed/drug_combos/transfer_splits_1_5.pkl'
         )
         )
 
