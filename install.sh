@@ -7,12 +7,14 @@ conda install -c anaconda pip
 # Install requirements
 pip install -r requirements.txt
 
+# Install pytorch with conda
+conda install -c pytorch pytorch==1.10.2
+
 # Install ray
 pip install -U "ray[tune]"
 
 # Install recover
 pip install -e .
-
 
 # Install rdkit
 conda install -c rdkit rdkit
