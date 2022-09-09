@@ -173,8 +173,6 @@ class DrugCombMatrix:
 
     def get_blocks(self):
         blocks = rsv.get_specific_drug_combo_blocks(
-            data_set='DrugComb',
-            version=1.5,
             study_name=self.study_name,
         )["block_id"]
 
@@ -192,8 +190,6 @@ class DrugCombMatrix:
 
         combo_data = rsv.get_drug_combo_data_combos(
             block_ids=blocks,
-            data_set='DrugComb',
-            version=1.5
         )
 
         if len(self.rounds_to_include) == 0:
@@ -266,7 +262,7 @@ class DrugCombMatrix:
         # Retrieve drugs that are not in the initial training set but that we want to add to the knowledge graph
         additional_drugs_df = pd.read_csv(os.path.join(
             rsv.RESERVOIR_DATA_FOLDER,
-            'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54.csv'
+            'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54_withReplacements.csv'
         ))
 
         additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_relation_id",
