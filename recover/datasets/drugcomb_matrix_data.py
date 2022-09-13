@@ -194,19 +194,19 @@ class DrugCombMatrix:
 
         if len(self.rounds_to_include) == 0:
             # If no rounds are included, we can add specific scores which are not provided in in house data
-            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max', 'synergy_bliss',
+            combo_data = combo_data[['cell_line_name', 'drug_row_recover_id', 'drug_row_smiles',
+                                     'drug_col_recover_id', 'drug_col_smiles', 'synergy_bliss_max', 'synergy_bliss',
                                      'css_ri']]
         else:
-            combo_data = combo_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                     'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
+            combo_data = combo_data[['cell_line_name', 'drug_row_recover_id', 'drug_row_smiles',
+                                     'drug_col_recover_id', 'drug_col_smiles', 'synergy_bliss_max']]
 
         combo_data['is_in_house'] = 0
 
         for round_id in self.rounds_to_include:
-            in_house_data = rsv.get_inhouse_data(project='oncology', experiment_round=round_id)
-            in_house_data = in_house_data[['cell_line_name', 'drug_row_relation_id', 'drug_row_smiles',
-                                           'drug_col_relation_id', 'drug_col_smiles', 'synergy_bliss_max']]
+            in_house_data = rsv.get_inhouse_data(experiment_round=round_id)
+            in_house_data = in_house_data[['cell_line_name', 'drug_row_recover_id', 'drug_row_smiles',
+                                           'drug_col_recover_id', 'drug_col_smiles', 'synergy_bliss_max']]
             in_house_data['is_in_house'] = 1
 
             # Add scores that are not included in in_house_data
@@ -265,16 +265,16 @@ class DrugCombMatrix:
             'parsed/drug_combos/drug_combos_test_experiments_Almanac54xDrugcomb54_withReplacements.csv'
         ))
 
-        additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_relation_id",
-                                            'recover_id_drug2': "drug_col_relation_id",
+        additional_drugs_df.rename(columns={'recover_id_drug1': "drug_row_recover_id",
+                                            'recover_id_drug2': "drug_col_recover_id",
                                             'smiles_drug1': "drug_row_smiles",
                                             'smiles_drug2': "drug_col_smiles"}, inplace=True)
 
         all_nodes_df = pd.concat((additional_drugs_df, combo_df))
 
         # Get dataframe containing the smiles of all the drugs
-        row_smiles = all_nodes_df[["drug_row_relation_id", "drug_row_smiles"]]
-        col_smiles = all_nodes_df[["drug_col_relation_id", "drug_col_smiles"]]
+        row_smiles = all_nodes_df[["drug_row_recover_id", "drug_row_smiles"]]
+        col_smiles = all_nodes_df[["drug_col_recover_id", "drug_col_smiles"]]
         row_smiles.columns = ["drug_recover_id", "smiles"]
         col_smiles.columns = ["drug_recover_id", "smiles"]
 
@@ -343,8 +343,8 @@ class DrugCombMatrix:
     def _get_ddi_edges(self, data_df, rec_id_to_idx_dict):
 
         # Add drug index information to the df
-        data_df["drug_row_idx"] = data_df['drug_row_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
-        data_df["drug_col_idx"] = data_df['drug_col_relation_id'].apply(lambda id: rec_id_to_idx_dict[id])
+        data_df["drug_row_idx"] = data_df['drug_row_recover_id'].apply(lambda id: rec_id_to_idx_dict[id])
+        data_df["drug_col_idx"] = data_df['drug_col_recover_id'].apply(lambda id: rec_id_to_idx_dict[id])
 
         # Get list of cell lines
         cell_line_list = list(data_df["cell_line_name"].unique())
