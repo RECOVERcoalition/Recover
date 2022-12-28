@@ -39,8 +39,7 @@ predictor_config = {
 }
 
 model_config = {
-    "model": EnsembleModel,
-    "ensemble_size": 5,
+    "model": Baseline,
     "load_model_weights": False,
 }
 

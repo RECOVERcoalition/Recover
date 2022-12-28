@@ -1,6 +1,6 @@
-from recover.datasets.drugcomb_matrix_data import DrugCombMatrix, DrugCombMatrixTrainOneil
-from recover.models.models import Baseline, EnsembleModel, PredictiveUncertaintyModel
-from recover.models.predictors import BilinearFilmMLPPredictor, BilinearMLPPredictor
+from recover.datasets.drugcomb_matrix_data import DrugCombMatrix
+from recover.models.models import Baseline
+from recover.models.predictors import BilinearFilmMLPPredictor, BilinearMLPPredictor, FilmMLPPredictor
 from recover.utils.utils import get_project_root
 from recover.train import train_epoch, eval_epoch, BasicTrainer
 import os
@@ -26,7 +26,7 @@ pipeline_config = {
 }
 
 predictor_config = {
-    "predictor": BilinearFilmMLPPredictor,
+    "predictor": FilmMLPPredictor,
     "predictor_layers":
         [
             2048,
@@ -39,18 +39,17 @@ predictor_config = {
 }
 
 model_config = {
-    "model": EnsembleModel,
-    "ensemble_size": 5,
+    "model": Baseline,
     "load_model_weights": False,
 }
 
 dataset_config = {
-    "dataset": DrugCombMatrixTrainOneil,
-    "study_name": 'ONEIL',
+    "dataset": DrugCombMatrix,
+    "study_name": 'ALMANAC',
     "in_house_data": 'without',
     "rounds_to_include": [],
     "val_set_prop": 0.2,
-    "test_set_prop": 0.,
+    "test_set_prop": 0.1,
     "test_on_unseen_cell_line": False,
     "split_valid_train": "pair_level",
     "cell_line": None,  # 'PC-3',
@@ -72,7 +71,7 @@ configuration = {
         **dataset_config,
     },
     "summaries_dir": os.path.join(get_project_root(), "RayLogs"),
-    "memory": 3000,
+    "memory": 1800,
     "stop": {"training_iteration": 1000, 'patience': 10},
     "checkpoint_score_attr": 'eval/comb_r_squared',
     "keep_checkpoints_num": 1,

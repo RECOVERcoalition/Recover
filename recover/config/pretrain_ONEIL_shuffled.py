@@ -1,6 +1,6 @@
 from recover.datasets.drugcomb_matrix_data import DrugCombMatrix, DrugCombMatrixTrainOneil
 from recover.models.models import Baseline, EnsembleModel, PredictiveUncertaintyModel
-from recover.models.predictors import BilinearFilmMLPPredictor, BilinearMLPPredictor
+from recover.models.predictors import ShuffledBilinearFilmMLPPredictor, BilinearMLPPredictor
 from recover.utils.utils import get_project_root
 from recover.train import train_epoch, eval_epoch, BasicTrainer
 import os
@@ -26,7 +26,7 @@ pipeline_config = {
 }
 
 predictor_config = {
-    "predictor": BilinearFilmMLPPredictor,
+    "predictor": ShuffledBilinearFilmMLPPredictor,
     "predictor_layers":
         [
             2048,
@@ -39,8 +39,7 @@ predictor_config = {
 }
 
 model_config = {
-    "model": EnsembleModel,
-    "ensemble_size": 5,
+    "model": Baseline,
     "load_model_weights": False,
 }
 

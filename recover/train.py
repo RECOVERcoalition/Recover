@@ -262,7 +262,10 @@ class ActiveTrainer(BasicTrainer):
             return {"all_space_explored": 1, "training_iteration": self.training_it}
 
         # Train on seen examples
-        seen_metrics = self.train_between_queries()
+        if len(self.seen_idxs) > 0:
+            seen_metrics = self.train_between_queries()
+        else:
+            seen_metrics = {}
 
         # Evaluate on valid set
         eval_metrics, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
@@ -294,7 +297,8 @@ class ActiveTrainer(BasicTrainer):
 
         # Add the query to the seen examples
         self.seen_idxs = torch.cat((self.seen_idxs, query))
-        metrics["seen_idxs"] = self.data.ddi_edge_idx[:, self.seen_idxs]
+        metrics["seen_idxs"] = self.data.ddi_edge_idx[:, self.seen_idxs].detach().cpu().tolist()
+        metrics["seen_idxs_in_dataset"] = self.seen_idxs.detach().cpu().tolist()
 
         # Compute proportion of top 1% synergistic drugs which have been discovered
         query_set = set(query.detach().numpy())
@@ -430,7 +434,8 @@ def train(configuration):
         # Use tune
         ###########################################
 
-        ray.init()
+        ray.init(num_cpus=configuration["resources_per_trial"]["cpu"],
+                 num_gpus=configuration["resources_per_trial"]["gpu"])
 
         time_to_sleep = 5
         print("Sleeping for %d seconds" % time_to_sleep)
