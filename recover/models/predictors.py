@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.nn as nn
 from torch.nn import Parameter
 
@@ -545,6 +546,68 @@ class ShuffledBilinearFilmWithFeatMLPPredictor(ShuffledBilinearMLPPredictor):
 class ShuffledBilinearLinFilmWithFeatMLPPredictor(ShuffledBilinearFilmWithFeatMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(ShuffledBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def linear_layer(self, i, dim_i, dim_i_plus_1):
+        return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
+                                                                               self.layer_dims[i + 1])]
+
+
+########################################################################################################################
+# Partially shuffled models
+########################################################################################################################
+
+
+class PartiallyShuffledBilinearMLPPredictor(BilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+
+        prop_of_shuffled_drugs = config["prop_of_shuffled_drugs"]
+        assert 1 >= prop_of_shuffled_drugs >= 0
+
+        if prop_of_shuffled_drugs > 0:
+            indices_to_be_shuffled = np.random.choice(data.x_drugs.shape[0],
+                                                      size=int(data.x_drugs.shape[0] * prop_of_shuffled_drugs),
+                                                      replace=False)
+
+            permuted_indices_to_be_shuffled = np.random.permutation(indices_to_be_shuffled)
+
+            # Shuffle the identities of some of the drugs
+            data.x_drugs[indices_to_be_shuffled] = data.x_drugs[permuted_indices_to_be_shuffled]
+
+        super(PartiallyShuffledBilinearMLPPredictor, self).__init__(data, config, predictor_layers)
+
+
+class PartiallyShuffledBilinearFilmMLPPredictor(PartiallyShuffledBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(PartiallyShuffledBilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def linear_layer(self, i, dim_i, dim_i_plus_1):
+        return [LinearModule(dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
+
+
+class PartiallyShuffledBilinearFilmWithFeatMLPPredictor(PartiallyShuffledBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        self. cl_features_dim = data.cell_line_features.shape[1]
+        super(PartiallyShuffledBilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def linear_layer(self, i, dim_i, dim_i_plus_1):
+        return [LinearModule(dim_i, dim_i_plus_1), FilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+        batch_cl_features = data.cell_line_features[cell_lines]
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, batch_cl_features
+
+
+class PartiallyShuffledBilinearLinFilmWithFeatMLPPredictor(PartiallyShuffledBilinearFilmWithFeatMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(PartiallyShuffledBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
