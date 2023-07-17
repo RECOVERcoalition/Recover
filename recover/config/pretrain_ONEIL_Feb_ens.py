@@ -78,7 +78,7 @@ configuration = {
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
     "checkpoint_freq": 1,
-    "resources_per_trial": {"cpu": 8, "gpu": 0},
+    "resources_per_trial": {"cpu": 6, "gpu": 1},
     "scheduler": None,
     "search_alg": None,
 }

@@ -24,9 +24,10 @@ To run the pipeline with a custom configuration:
 - Create your configuration file and move it to `Recover/recover/config/`
 - Run `python train.py --config <my_configuration_file>`
 
-Note that `<my_configuration_file>` should not include *.py*. For example, to run the pipeline with configuration from 
-the file `model_evaluation.py`, run `python train.py --config model_evaluation`
+For example, to run the pipeline with configuration from 
+the file `model_evaluation.py`, run `python train.py --config model_evaluation`.
 
+Log files will automatically be created to save the results of the experiments.
 
 ## Note
 

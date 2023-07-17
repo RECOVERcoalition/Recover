@@ -1,4 +1,4 @@
-conda create --name recover python=3.6
+conda create --name recover python=3.8
 conda activate recover
 
 # Install pip

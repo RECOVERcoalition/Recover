@@ -883,6 +883,139 @@ class DrugCombMatrixDrugLevelSplitTest(DrugCombMatrix):
         )
 
 
+########################################################################################################################
+# Dataset objects for split with exactly one hidden drug
+########################################################################################################################
+
+
+class DrugCombMatrixOneHiddenDrugSplitTrain(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        propr_drug_in_trainval = 0.7
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        trainval_drug_idxs = all_drug_idxs[:int(propr_drug_in_trainval*len(all_drug_idxs))]
+
+        trainval_ixs = []
+        for i in range(len(trainval_drug_idxs) -1):
+            for j in range(1, len(trainval_drug_idxs)):
+                is_i_j = torch.logical_and((self.data.ddi_edge_idx[0] == trainval_drug_idxs[i]),
+                (self.data.ddi_edge_idx[1] == trainval_drug_idxs[j]))
+
+                is_j_i = torch.logical_and((self.data.ddi_edge_idx[0] == trainval_drug_idxs[j]),
+                (self.data.ddi_edge_idx[1] == trainval_drug_idxs[i]))
+
+                is_ij_or_ji = torch.logical_or(is_i_j, is_j_i)
+                trainval_ixs += list(np.where(is_ij_or_ji)[0])
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, trainval_ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][trainval_ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
+class DrugCombMatrixOneHiddenDrugSplitTest(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        propr_drug_in_trainval = 0.7
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        trainval_drug_idxs = all_drug_idxs[:int(propr_drug_in_trainval*len(all_drug_idxs))]
+        hidden_drug_idxs = all_drug_idxs[int(propr_drug_in_trainval * len(all_drug_idxs)):]
+
+        test_ixs = []
+        for i in range(len(trainval_drug_idxs)):
+            for j in range(len(hidden_drug_idxs)):
+                is_i_j = torch.logical_and((self.data.ddi_edge_idx[0] == trainval_drug_idxs[i]),
+                (self.data.ddi_edge_idx[1] == hidden_drug_idxs[j]))
+
+                is_j_i = torch.logical_and((self.data.ddi_edge_idx[0] == hidden_drug_idxs[j]),
+                (self.data.ddi_edge_idx[1] == trainval_drug_idxs[i]))
+
+                is_ij_or_ji = torch.logical_or(is_i_j, is_j_i)
+                test_ixs += list(np.where(is_ij_or_ji)[0])
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, test_ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][test_ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
+class DrugCombMatrixOneHiddenDrugSplitTestExtension(DrugCombMatrix):
+    def __init__(self,
+                 fp_bits=1024,
+                 fp_radius=4,
+                 cell_line=None,
+                 study_name="ALMANAC",
+                 in_house_data="without",
+                 rounds_to_include=()):
+        super().__init__(fp_bits, fp_radius, cell_line, study_name, in_house_data, rounds_to_include)
+        propr_drug_in_trainval = 0.7
+
+        # Choose at random a proportion drug_prop of the drugs
+        all_drug_idxs = list(self.data.rec_id_to_idx_dict.values())
+        random.Random(0).shuffle(all_drug_idxs)
+        trainval_drug_idxs = all_drug_idxs[:int(propr_drug_in_trainval*len(all_drug_idxs))]
+        hidden_drug_idxs = all_drug_idxs[int(propr_drug_in_trainval * len(all_drug_idxs)):]
+
+        test_ixs = []
+        for i in range(len(hidden_drug_idxs) -1):
+            for j in range(1, len(hidden_drug_idxs)):
+                is_i_j = torch.logical_and((self.data.ddi_edge_idx[0] == hidden_drug_idxs[i]),
+                (self.data.ddi_edge_idx[1] == hidden_drug_idxs[j]))
+
+                is_j_i = torch.logical_and((self.data.ddi_edge_idx[0] == hidden_drug_idxs[j]),
+                (self.data.ddi_edge_idx[1] == hidden_drug_idxs[i]))
+
+                is_ij_or_ji = torch.logical_or(is_i_j, is_j_i)
+                test_ixs += list(np.where(is_ij_or_ji)[0])
+
+        for attr in dir(self.data):
+            if attr.startswith("ddi_edge_idx"):
+                self.data[attr] = self.data[attr][:, test_ixs]
+            elif attr.startswith("ddi_edge_"):
+                self.data[attr] = self.data[attr][test_ixs]
+
+        print(
+            self.data.ddi_edge_idx.shape[1],
+            "drug comb experiments among",
+            self.data.x_drugs.shape[0],
+            "drugs",
+        )
+
+
 if __name__ == "__main__":
 
     dataset = DrugCombMatrixTrainOneil(
@@ -904,3 +1037,24 @@ if __name__ == "__main__":
     )
 
     print(dataset.data.cell_line_to_idx_dict)
+
+    dataset1 = DrugCombMatrixOneHiddenDrugSplitTrain(
+        in_house_data='without',
+        rounds_to_include=[],
+        cell_line=None,
+        fp_bits=1024,
+        fp_radius=2
+    )
+
+    dataset2 = DrugCombMatrixOneHiddenDrugSplitTest(
+        in_house_data='without',
+        rounds_to_include=[],
+        cell_line=None,
+        fp_bits=1024,
+        fp_radius=2
+    )
+
+    trainval_drug_idxs = dataset1.data.ddi_edge_idx.reshape(-1).unique().tolist()
+    indices_are_trainval_drugs = sum(dataset2.data.ddi_edge_idx == i for i in trainval_drug_idxs).bool()
+
+    print(indices_are_trainval_drugs)
