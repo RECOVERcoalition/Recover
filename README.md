@@ -14,7 +14,7 @@ against a cancer cell line, requiring substantially less screening than an exhau
 both are installed on the system prior to running installation.
 
 **Installation**: enter the command `source install.sh` and follow the instructions. This will create a conda 
-environment named **recover** and install all the required package including the 
+environment named **recover** and install all the required packages including the 
 [reservoir](https://github.com/RECOVERcoalition/Reservoir) package that stores the primary data acquisition scripts.
 
 ## Running the pipeline
