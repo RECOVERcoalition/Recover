@@ -1,4 +1,5 @@
 # RECOVER: sequential model optimization platform for combination drug repurposing identifies novel synergistic compounds *in vitro*
+[![DOI](https://zenodo.org/badge/320327566.svg)](https://zenodo.org/badge/latestdoi/320327566)
 
 RECOVER is a platform that can guide wet lab experiments to quickly discover synergistic drug combinations active 
 against a cancer cell line, requiring substantially less screening than an exhaustive evaluation 
