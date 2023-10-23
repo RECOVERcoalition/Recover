@@ -17,7 +17,7 @@ both are installed on the system prior to running installation.
 environment named **recover** and install all the required packages including the 
 [reservoir](https://github.com/RECOVERcoalition/Reservoir) package that stores the primary data acquisition scripts.
 
-In case you have any issue with the installation procedure of the *reservoir*, you can access and download all files directly from this [google drive](https://drive.google.com/drive/folders/1MYeDoAi0-qnhSJTvs68r861iMOdoqYki?usp=share_link)
+In case you have any issue with the installation procedure of the *reservoir*, you can access and download all files directly from this [google drive](https://drive.google.com/drive/folders/1MYeDoAi0-qnhSJTvs68r861iMOdoqYki?usp=share_link).
 
 ## Running the pipeline
 
