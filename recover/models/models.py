@@ -1,4 +1,5 @@
 import torch
+import torchbnn as bnn
 
 
 ########################################################################################################################
@@ -15,7 +16,7 @@ class Baseline(torch.nn.Module):
         self.device = torch.device(device_type)
 
         self.criterion = torch.nn.MSELoss()
-
+        
         # Compute dimension of input for predictor
         predictor_layers = [data.x_drugs.shape[1]] + config["predictor_layers"]
 
@@ -39,9 +40,8 @@ class Baseline(torch.nn.Module):
         comb = output
         ground_truth_scores = drug_drug_batch[2][:, None]
         loss = self.criterion(comb, ground_truth_scores)
-
+        
         return loss
-
 
 ########################################################################################################################
 # Model wrappers: Ensemble and Predictive Uncertainty
