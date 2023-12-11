@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 from torch.nn import Parameter
+import torch.nn.functional as F
 
 ########################################################################################################################
 # Modules
@@ -25,6 +26,18 @@ class ReLUModule(nn.ReLU):
         x, cell_line = input[0], input[1]
         return [super().forward(x), cell_line]
 
+class ScaledSigmoid(nn.Module):
+    def __init__(self, scale_factor=100):
+        super(ScaledSigmoid, self).__init__()
+        self.scale_factor = scale_factor
+
+    def forward(self, x):
+        if isinstance(x, list):
+            # Apply sigmoid to each tensor in the list
+            return [self.scale_factor * F.sigmoid(tensor) for tensor in x]
+        else:
+            # Apply sigmoid to a single tensor
+            return self.scale_factor * F.sigmoid(x)
 
 class DropoutModule(nn.Dropout):
     def __init__(self, p):
@@ -205,6 +218,9 @@ class BilinearMLPPredictor(torch.nn.Module):
         layers.extend(self.linear_layer(i, dim_i, dim_i_plus_1))
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
+        else:
+            # layers.append(nn.Sigmoid() * 100)
+            layers.append(ScaledSigmoid(scale_factor=100))
 
         return layers
 
@@ -361,6 +377,9 @@ class MLPPredictor(torch.nn.Module):
         layers.extend(self.linear_layer(i, dim_i, dim_i_plus_1))
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
+        # else:
+        #     # layers.append(nn.Sigmoid() * 100)
+        #     layers.append(ScaledSigmoid(scale_factor=100))
 
         return layers
 
