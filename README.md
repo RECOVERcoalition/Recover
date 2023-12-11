@@ -1,4 +1,4 @@
-# Machine Learning Driven Candidate Compound Generation for Drug Repurposing 
+# Machine Learning Driven Candidate Compound Generation for Drug Repurposing
 Based on RECOVER: sequential model optimization platform for combination drug repurposing identifies novel synergistic compounds *in vitro*
 [![DOI](https://zenodo.org/badge/320327566.svg)](https://zenodo.org/badge/latestdoi/320327566)
 
@@ -6,7 +6,9 @@ This repository is an implementation of RECOVER, a platform that can guide wet l
 ([preprint](https://arxiv.org/abs/2202.04202)), howerver instead of using an ensemble model to get Synergy predictions with uncertainty, we used multiple realization of a Bayesian Neural Network model. 
 Since the weights are drawn from a distribution, they differ for every run of a trained model and hence give different results. The goal was to get a more precise uncertainty and achieve i quicker since the model doesn't have to be trained multiple times. 
 
-![Overview](docs/images/ProjectInfographics.png "Overview")
+<div>
+  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="500"/>
+</div>
 
 ## Environment setup
 
