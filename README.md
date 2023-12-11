@@ -6,7 +6,7 @@ This repository is an implementation of RECOVER, a platform that can guide wet l
 ([preprint](https://arxiv.org/abs/2202.04202)), howerver instead of using an ensemble model to get Synergy predictions with uncertainty, we used multiple realization of a Bayesian Neural Network model. 
 Since the weights are drawn from a distribution, they differ for every run of a trained model and hence give different results. The goal was to get a more precise uncertainty and achieve i quicker since the model doesn't have to be trained multiple times. 
 
-![Overview](docs/images/overview.png "Overview")
+![Overview](docs/images/Project Infographics.jpg "Overview")
 
 ## Environment setup
 
