@@ -11,6 +11,7 @@ import numpy as np
 import importlib
 from scipy import stats
 from scipy.stats import spearmanr
+import torch.nn.functional as F
 
 
 ########################################################################################################################
@@ -218,6 +219,50 @@ class BasicTrainer(tune.Trainable):
     def load_checkpoint(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
 
+########################################################################################################################
+# Bayesian Epoch loops
+########################################################################################################################
+
+
+def train_epoch_bayesian(data, loader, model, optim):
+    model.train()
+    epoch_loss = 0
+    num_batches = len(loader)
+    kl_loss = model.kl_loss()
+    all_mean_preds = []
+    all_targets = []
+    for _, drug_drug_batch in enumerate(loader):
+        optim.zero_grad()
+        out = model.forward(data, drug_drug_batch)
+        # Save all predictions and targets
+        all_mean_preds.extend(out.mean(dim=1).tolist())
+        all_targets.extend(drug_drug_batch[2].tolist())
+        loss_mse = model.loss(out, drug_drug_batch)
+        kl_weight = 0.01
+        kl_loss_value = model.kl_loss()
+        #kl = kl_loss(model)
+        kl = kl_loss_value
+        loss = loss_mse + kl_weight * kl
+        loss.backward()
+        optim.step()
+        epoch_loss += loss.item()
+    epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
+    a = np.array(all_mean_preds)
+    b = np.array(all_targets)
+    x = np.square(a-b)
+    epoch_mse = np.mean(x)
+    # print("all_mean_preds: ", all_mean_preds)
+    summary_dict = {
+        # "loss_mean": epoch_loss / num_batches,
+        
+        "comb_r_squared": epoch_comb_r_squared,
+        # "mse": epoch_mse,
+        "loss_mse": loss_mse.item(),
+        "loss_kl": kl.item() * kl_weight,
+        # "kl_weight": epoch_mse+kl.item(),
+    }
+    print("Training", summary_dict)
+    return summary_dict
 
 ########################################################################################################################
 # Active learning Trainer
