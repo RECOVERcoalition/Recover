@@ -226,7 +226,7 @@ class BilinearMLPPredictor(torch.nn.Module):
 ########################################################################################################################
 
 
-class BayesianBilinearMLPPredictor(torch.nn.Module): #BAYESIAN ADD ON
+class BayesianBilinearMLPPredictor(torch.nn.Module): 
     def __init__(self, data, config, predictor_layers):
 
         super(BayesianBilinearMLPPredictor, self).__init__()
@@ -493,6 +493,96 @@ class MLPPredictor(torch.nn.Module):
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1)]
+        
+
+########################################################################################################################
+# Bayesian no permutation invariance MLP
+########################################################################################################################
+
+
+class BayesianMLPPredictor(torch.nn.Module):
+    def __init__(self, data, config, predictor_layers):
+
+        super(BayesianMLPPredictor, self).__init__()
+
+        self.num_cell_lines = len(data.cell_line_to_idx_dict.keys())
+        device_type = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(device_type)
+
+        self.layer_dims = predictor_layers
+
+        self.merge_n_layers_before_the_end = config["merge_n_layers_before_the_end"]
+        self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
+
+        assert 0 < self.merge_n_layers_before_the_end < len(predictor_layers)
+
+        layers_before_merge = []
+        layers_after_merge = []
+
+        # Build early Bayesian layers (before addition of the two embeddings)
+        for i in range(len(self.layer_dims) - 1 - self.merge_n_layers_before_the_end):
+            layers_before_merge = self.add_bayesian_layer(
+                layers_before_merge,
+                i,
+                0,
+                0.005,
+                self.layer_dims[i],
+                self.layer_dims[i + 1]
+            )
+
+        # We will concatenate the two single drug embeddings so the input of the after_merge_mlp is twice its usual dim
+        self.layer_dims[- 1 - self.merge_n_layers_before_the_end] *= 2
+
+        # Build last Bayesian layers (after addition of the two embeddings)
+        for i in range(
+            len(self.layer_dims) - 1 - self.merge_n_layers_before_the_end,
+            len(self.layer_dims) - 1,
+        ):
+
+            layers_after_merge = self.add_bayesian_layer(
+                layers_after_merge,
+                i,
+                0,
+                0.005,
+                self.layer_dims[i],
+                self.layer_dims[i + 1]
+            )
+
+        self.before_merge_mlp = nn.Sequential(*layers_before_merge)
+        self.after_merge_mlp = nn.Sequential(*layers_after_merge)
+
+    def forward(self, data, drug_drug_batch):
+        h_drug_1, h_drug_2, cell_lines = self.get_batch(data, drug_drug_batch)
+
+        # Apply before merge MLP
+        h_1 = self.before_merge_mlp([h_drug_1, cell_lines])[0]
+        h_2 = self.before_merge_mlp([h_drug_2, cell_lines])[0]
+
+        comb = self.after_merge_mlp([torch.cat((h_1, h_2), dim=1), cell_lines])[0]
+
+        return comb
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, cell_lines
+
+    #functions for defining and adding a bayesian linear layer using Bayesian Linear Module
+    def add_bayesian_layer(self, layers, i, mu, sigma, dim_i, dim_i_plus_1):
+        layers.extend(self.bayesian_linear_layer(i, mu, sigma, dim_i, dim_i_plus_1))
+        if i != len(self.layer_dims) - 2:
+            layers.append(ReLUModule())
+        
+        return layers
+        
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1)]
 
 
 ########################################################################################################################
