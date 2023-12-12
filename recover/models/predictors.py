@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.nn import Parameter
 import torchbnn as bnn
 
+
 ########################################################################################################################
 # Modules
 ########################################################################################################################
@@ -16,8 +17,8 @@ class LinearModule(nn.Linear):
     def forward(self, input):
         x, cell_line = input[0], input[1]
         return [super().forward(x), cell_line]
-
-
+ 
+        
 #added a Bayesian Linear Module    
 class BayesianLinearModule(bnn.BayesLinear):
     def __init__(self, prior_mu, prior_sigma, in_features, out_features):
@@ -26,6 +27,7 @@ class BayesianLinearModule(bnn.BayesLinear):
     def forward(self, input):
         x, cell_line = input[0], input[1]
         return [super().forward(x), cell_line]
+
 class ReLUModule(nn.ReLU):
     def __init__(self):
         super(ReLUModule, self).__init__()
@@ -113,8 +115,6 @@ class LinearFilmWithFeatureModule(torch.nn.Module):
 ########################################################################################################################
 # Bilinear MLP
 ########################################################################################################################
-
-
 class BilinearMLPPredictor(torch.nn.Module):
     def __init__(self, data, config, predictor_layers):
 
@@ -219,7 +219,7 @@ class BilinearMLPPredictor(torch.nn.Module):
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1)]
-
+        
 
 ########################################################################################################################
 # Bayesian Bilinear MLP
@@ -336,8 +336,8 @@ class BayesianBilinearMLPPredictor(torch.nn.Module): #BAYESIAN ADD ON
         
     def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
         return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1)]
- 
-
+        
+    
 
 ########################################################################################################################
 # Bilinear MLP with Film conditioning
@@ -677,6 +677,25 @@ class ShuffledBilinearLinFilmWithFeatMLPPredictor(ShuffledBilinearFilmWithFeatML
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
                                                                                self.layer_dims[i + 1])]
+
+########################################################################################################################
+# Shuffled model Bayesian 
+########################################################################################################################
+
+
+class BayesianShuffledBilinearMLPPredictor(BayesianBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+
+        # Shuffle the identities of the drugs
+        data.x_drugs = data.x_drugs[torch.randperm(data.x_drugs.shape[0])]
+
+        # Shuffle the identities of the cell lines
+        value_perm = torch.randperm(len(data.cell_line_to_idx_dict))
+        data.cell_line_to_idx_dict = {k: value_perm[v].item() for k, v in data.cell_line_to_idx_dict.items()}
+
+        super(BayesianShuffledBilinearMLPPredictor, self).__init__(data, config, predictor_layers)
+
+
 
 
 ########################################################################################################################
