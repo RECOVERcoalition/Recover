@@ -382,6 +382,50 @@ class BilinearLinFilmWithFeatMLPPredictor(BilinearFilmWithFeatMLPPredictor):
                                                                                self.layer_dims[i + 1])]
 
 
+########################################################################################################################
+# Bayesian bilinear MLP with Film conditioning
+########################################################################################################################
+
+
+class BayesianBilinearFilmMLPPredictor(BayesianBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianBilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
+
+
+class BayesianBilinearFilmWithFeatMLPPredictor(BayesianBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        self. cl_features_dim = data.cell_line_features.shape[1]
+        super(BayesianBilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+        batch_cl_features = data.cell_line_features[cell_lines]
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, batch_cl_features
+
+
+class BayesianBilinearLinFilmWithFeatMLPPredictor(BilinearFilmWithFeatMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
+                                                                               self.layer_dims[i + 1])]
+
+
+
 # ########################################################################################################################
 # # Bilinear MLP with Cell line features as input
 # ########################################################################################################################
