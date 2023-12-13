@@ -670,6 +670,49 @@ class LinFilmWithFeatMLPPredictor(FilmWithFeatMLPPredictor):
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
                                                                                self.layer_dims[i + 1])]
+                                                                               
+                                                                               
+########################################################################################################################
+# Bayesian no permutation invariance MLP with Film conditioning
+########################################################################################################################
+
+
+class BayesianFilmMLPPredictor(BayesianMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
+
+
+class BayesianFilmWithFeatMLPPredictor(BayesianMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        self. cl_features_dim = data.cell_line_features.shape[1]
+        super(BayesianFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+        batch_cl_features = data.cell_line_features[cell_lines]
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, batch_cl_features
+
+
+class BayesianLinFilmWithFeatMLPPredictor(FilmWithFeatMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
+                                                                               self.layer_dims[i + 1])]
 
 
 ########################################################################################################################
@@ -813,7 +856,7 @@ class ShuffledBilinearLinFilmWithFeatMLPPredictor(ShuffledBilinearFilmWithFeatML
                                                                                self.layer_dims[i + 1])]
 
 ########################################################################################################################
-# Shuffled model Bayesian 
+# Bayesian shuffled models  
 ########################################################################################################################
 
 
@@ -828,6 +871,44 @@ class BayesianShuffledBilinearMLPPredictor(BayesianBilinearMLPPredictor):
         data.cell_line_to_idx_dict = {k: value_perm[v].item() for k, v in data.cell_line_to_idx_dict.items()}
 
         super(BayesianShuffledBilinearMLPPredictor, self).__init__(data, config, predictor_layers)
+              
+        
+class BayesianShuffledBilinearFilmMLPPredictor(BayesianShuffledBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianShuffledBilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
+
+
+class BayesianShuffledBilinearFilmWithFeatMLPPredictor(BayesianShuffledBilinearMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        self. cl_features_dim = data.cell_line_features.shape[1]
+        super(BayesianShuffledBilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), FilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+        batch_cl_features = data.cell_line_features[cell_lines]
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, batch_cl_features
+
+
+class BayesianShuffledBilinearLinFilmWithFeatMLPPredictor(ShuffledBilinearFilmWithFeatMLPPredictor):
+    def __init__(self, data, config, predictor_layers):
+        super(BayesianShuffledBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+
+    def bayesian_linear_layer(self, i, mu, sigma, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(mu, sigma, dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim,
+                                                                               self.layer_dims[i + 1])]
 
 
 
