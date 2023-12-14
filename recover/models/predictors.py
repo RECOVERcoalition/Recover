@@ -42,26 +42,6 @@ class ScaledSigmoid(nn.Module):
 
 
 
-# class Gaussian(object):
-#     def __init__(self, mu, rho):
-#         super().__init__()
-#         self.mu = mu
-#         self.rho = rho
-#         self.normal = torch.distributions.Normal(0,1)
-    
-#     @property
-#     def sigma(self):
-#         return torch.log1p(torch.exp(self.rho))
-    
-#     def sample(self):
-#         epsilon = self.normal.sample(self.rho.size())
-#         return self.mu + self.sigma * epsilon
-    
-#     def log_prob(self, input):
-#         return (-math.log(math.sqrt(2 * math.pi))
-#                 - torch.log(self.sigma)
-#                 - ((input - self.mu) ** 2) / (2 * self.sigma ** 2)).sum()
-
 class ScaleMixtureGaussian(object): #scale mixture Gaussian
     def __init__(self, pi, sigma1, sigma2):
         super().__init__()
@@ -151,7 +131,6 @@ class BayesianLinearModule(nn.Linear):
         
     
     def kl_loss(self):
-        # print("Let's see what's going on: ", self.log_variational_posterior - self.log_prior)
         return self.log_variational_posterior - self.log_prior
 
 
@@ -198,10 +177,10 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
                 self.layer_dims[i + 1]
             )
         self.before_merge_mlp = nn.Sequential(*layers_before_merge)
-        # self.after_merge_mlp = nn.Sequential(*layers_after_merge)
+        self.after_merge_mlp = nn.Sequential(*layers_after_merge)
 
         # self.before_merge_mlp = layers_before_merge
-        self.after_merge_mlp = layers_after_merge
+        # self.after_merge_mlp = layers_after_merge
 
         # Number of bilinear transformations == the dimension of the layer at which the merge is performed
         # Initialize weights close to identity
@@ -255,13 +234,13 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         h_1_scal_h_2 += self.bilinear_offsets
 
         # Instead of
-        # comb = self.after_merge_mlp([h_1_scal_h_2, cell_lines])[0]
+        comb = self.after_merge_mlp([h_1_scal_h_2, cell_lines])[0]
         # We do
-        input_3 = [h_1_scal_h_2, cell_lines]
-        for layer in self.after_merge_mlp:
-            input_3 = layer(input_3)#, sample=True)
+        # input_3 = [h_1_scal_h_2, cell_lines]
+        # for layer in self.after_merge_mlp:
+        #     input_3 = layer(input_3)#, sample=True)
          
-        comb = input_3[0]
+        # comb = input_3[0]
 
         return comb
     
