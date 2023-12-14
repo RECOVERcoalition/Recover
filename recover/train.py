@@ -59,7 +59,7 @@ def train_epoch(data, loader, model, optim):
 
 """
 The cost function is updated to consider both MSE loss and KL loss
-KL weight is set to 0.01
+KL weight is set according to batchsize 
 Default model loss is unchanged - MSE (For comparision with Rec
 """
 def bayesian_train_epoch(data, loader, model, optim):
@@ -88,21 +88,20 @@ def bayesian_train_epoch(data, loader, model, optim):
         kl = kl_loss(model)
 
         kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1) #kl weight based on the paper "Weight Uncertainty in Neural Networks"
-        batch += 1
-        
+
         cost = loss + kl_weight*kl
 
         cost.backward()
         optim.step()
 
         epoch_loss += loss.item()
+        batch += 1
 
     epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
 
     summary_dict = {
         "loss_mean": epoch_loss / num_batches,
         "comb_r_squared": epoch_comb_r_squared
-        #"cost": cost.item()
     }
 
     print("Training", summary_dict)
@@ -148,6 +147,10 @@ def eval_epoch(data, loader, model):
     return summary_dict, all_out
 
 
+"""
+Eval epoch is the same as the non-bayesian method, 
+minor changes were done to return drug combinations for ease of analysis
+"""
 def bayesian_eval_epoch(data, loader, model):
     model.eval()
 
@@ -185,6 +188,7 @@ def bayesian_eval_epoch(data, loader, model):
     all_out = torch.cat(all_out)
 
     return summary_dict, all_out, all_combs
+
 
 """
 Custom Aggregration function for obtaining results when training with multi cell-lines 
@@ -333,6 +337,7 @@ class BayesianBasicTrainer(tune.Trainable):
         print("Initializing regular training pipeline")
 
         self.batch_size = config["batch_size"]
+        self.num_realizations = config["num_realizations"]
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device_type)
         self.training_it = 0
@@ -423,7 +428,7 @@ class BayesianBasicTrainer(tune.Trainable):
 
     def step(self):
     
-        num_realizations = 10
+        num_realizations = self.num_realizations
 
         train_metrics = self.train_epoch(
             self.data,
@@ -472,21 +477,21 @@ class BayesianBasicTrainer(tune.Trainable):
             synergy_mean = list(torch.mean(result_synergy, dim=1).numpy())
             synergy_std = list(torch.std(result_synergy, dim=1).numpy())
             
+            """
+            # Uncomment this to get the synergy prediction performance when working with multi-cell lines 
+            # Aggregate result for duplicate sets regardless of cell-line
             result_tuples = list(map(lambda inner_list: tuple(sorted(inner_list)), drug_combs))
-            
             dataset = pd.DataFrame({'combination': result_tuples, 'mean': synergy_mean, 'std': synergy_std }, columns=['combination', 'mean', 'std'])
-            
             result_df = dataset.groupby('combination').apply(custom_agg) # Do custom aggregration  - Not needed when working on one cell-line but no difference in results
-            
             result_df.reset_index(drop=True, inplace=True)
+            """
             
-            metrics.update(dict(test_result)) # Add test results to output files
+            metrics.update(dict(test_result))
             
-            metrics['synergy_combs'] = list(result_df['combination'])
-            metrics['synergy_mean'] = list(result_df['mean'])
-            metrics['synergy_std'] = list(result_df['std'])
+            metrics['synergy_combs'] = list(drug_combs)
+            metrics['synergy_mean'] = list(synergy_mean)
+            metrics['synergy_std'] = list(synergy_std)
             
-            #metrics.update(dict(drug_combinations_synergy))
         
         return metrics
     
