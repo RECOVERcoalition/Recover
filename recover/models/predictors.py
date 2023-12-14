@@ -43,7 +43,15 @@ class DropoutModule(nn.Dropout):
     def forward(self, input):
         x, cell_line = input[0], input[1]
         return [super().forward(x), cell_line]
+        
+class ScaledSigmoid(nn.Sigmoid):
+    def __init__(self):
+        super(ScaledSigmoid, self).__init__()
 
+    def forward(self, input):
+        x, cell_line = input[0], input[1]
+        output_tensor = super().forward(x) * 100.0
+        return [output_tensor, cell_line]
 
 class FilmModule(torch.nn.Module):
     def __init__(self, num_cell_lines, out_dim):
@@ -244,6 +252,8 @@ class BilinearMLPPredictor(torch.nn.Module):
         layers.extend(self.bayes_linear_layer(i, dim_i, dim_i_plus_1))
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
+        else:
+            layers.append(ScaledSigmoid())
 
         return layers
 
