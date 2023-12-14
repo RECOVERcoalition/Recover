@@ -26,7 +26,7 @@ pipeline_config = {
 }
 
 predictor_config = {
-    "predictor": MLPPredictor,
+    "predictor": BilinearMLPPredictor,
     "bayesian_predictor": True,
     "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
     "num_realizations": 10, # For bayesian uncertainty
