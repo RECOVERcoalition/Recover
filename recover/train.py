@@ -143,43 +143,47 @@ def eval_epoch(data, loader, model):
 
     return summary_dict, all_out
 
-def bayesian_eval_epoch(data, loader, model):
-    model.eval()
+# def bayesian_eval_epoch(data, loader, model):
+#     model.eval()
 
-    epoch_loss = 0
-    num_batches = len(loader)
+#     epoch_loss = 0
+#     num_batches = len(loader)
 
-    all_out = []
-    all_mean_preds = []
-    all_targets = []
-    all_combs = []
+#     all_out = []
+#     all_mean_preds = []
+#     all_targets = []
+#     all_combs = []
 
-    with torch.no_grad():
-        for _, drug_drug_batch in enumerate(loader):
-            out = model.forward(data, drug_drug_batch)
+#     with torch.no_grad():
+#         for _, drug_drug_batch in enumerate(loader):
+#             out = model.forward(data, drug_drug_batch)
 
-            # Save all predictions and targets - rec_id_to_idx_dict
-            all_out.append(out)
-            all_mean_preds.extend(out.mean(dim=1).tolist())
-            all_targets.extend(drug_drug_batch[2].tolist())
-            all_combs.extend(drug_drug_batch[0].tolist())
+#             # Save all predictions and targets - rec_id_to_idx_dict
+#             all_out.append(out)
+#             all_mean_preds.extend(out.mean(dim=1).tolist())
+#             all_targets.extend(drug_drug_batch[2].tolist())
+#             all_combs.extend(drug_drug_batch[0].tolist())
 
-            loss = model.loss(out, drug_drug_batch)
-            epoch_loss += loss.item()
-        epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
-        epoch_spear = spearmanr(all_targets, all_mean_preds).correlation
+#             loss = model.loss(out, drug_drug_batch)
+#             epoch_loss += loss.item()
+#         epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
+#         epoch_spear = spearmanr(all_targets, all_mean_preds).correlation
 
-    summary_dict = {
-        "loss_mean": epoch_loss / num_batches,
-        "comb_r_squared": epoch_comb_r_squared,
-        "spearman": epoch_spear
-    }
+#     summary_dict = {
+#         "loss_mean": epoch_loss / num_batches,
+#         "comb_r_squared": epoch_comb_r_squared,
+#         "spearman": epoch_spear
+#     }
+#     #--------------------
+#     # Add metrics specific to the test set
+#     test_summary_dict, _ = eval_epoch(data, loader, model)
+#     summary_dict.update(test_summary_dict)
     
-    print("Testing", summary_dict, '\n')
+#     print("Testing", summary_dict, '\n')
 
-    all_out = torch.cat(all_out)
+#     all_out = torch.cat(all_out)
 
-    return summary_dict, all_out, all_combs
+#     return summary_dict, all_out, all_combs
 
 def custom_agg(group):
     max_row = group.loc[group['mean'].idxmax()]
@@ -282,8 +286,8 @@ class BasicTrainer(tune.Trainable):
             self.optim,
         )
 
-        eval_metrics, _,_ = self.eval_epoch(self.data, self.valid_loader, self.model)
-
+        eval_metrics, _= self.eval_epoch(self.data, self.valid_loader, self.model)
+        
         train_metrics = [("train/" + k, v) for k, v in train_metrics.items()]
         eval_metrics = [("eval/" + k, v) for k, v in eval_metrics.items()]
         metrics = dict(train_metrics + eval_metrics)
@@ -405,6 +409,7 @@ class BayesianBasicTrainer(tune.Trainable):
 
         self.train_epoch = config["train_epoch"]
         self.eval_epoch = config["eval_epoch"]
+        
 
         self.patience = 0
         self.max_eval_r_squared = -1
@@ -420,8 +425,9 @@ class BayesianBasicTrainer(tune.Trainable):
             self.optim,
         )
 
-        eval_metrics, _, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
-
+        eval_metrics, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
+        
+        
         train_metrics = [("train/" + k, v) for k, v in train_metrics.items()]
         eval_metrics = [("eval/" + k, v) for k, v in eval_metrics.items()]
 
@@ -443,11 +449,12 @@ class BayesianBasicTrainer(tune.Trainable):
 
         if ((self.patience >= self.patience_stop) | (self.training_it > self.max_iter)):
             test_result = {}
-            realization_results, result_synergy, drug_combs = self.eval_epoch(self.data, self.test_loader, self.model)
+            realization_results, result_synergy = self.eval_epoch(self.data, self.test_loader, self.model)
+           
             drug_combinations_synergy = {'data': self.test_idxs}
             test_metrics = dict([("test/" + k, [v]) for k, v in realization_results.items()])
             for i in range(num_realizations-1):
-                realization_results, new_synergy, _ = self.eval_epoch(self.data, self.test_loader, self.model)
+                realization_results, new_synergy = self.eval_epoch(self.data, self.test_loader, self.model)
                 result_synergy = torch.cat((result_synergy, new_synergy), dim=1)
                 for k, v in realization_results.items():
                     test_metrics["test/" + k].append(v)
@@ -460,20 +467,22 @@ class BayesianBasicTrainer(tune.Trainable):
             synergy_mean = list(torch.mean(result_synergy, dim=1).numpy())
             synergy_std = list(torch.std(result_synergy, dim=1).numpy())
             
-            result_tuples = list(map(lambda inner_list: tuple(sorted(inner_list)), drug_combs))
+            # result_tuples = list(map(lambda inner_list: tuple(sorted(inner_list))))
             
-            dataset = pd.DataFrame({'combination': result_tuples, 'mean': synergy_mean, 'std': synergy_std }, columns=['combination', 'mean', 'std'])
+            # dataset = pd.DataFrame({'combination': result_tuples, 'mean': synergy_mean, 'std': synergy_std }, columns=['combination', 'mean', 'std'])
             
-            result_df = dataset.groupby('combination').apply(custom_agg) # Do custom aggregration  - Not needed when working on one cell-line but no difference in results
+            # result_df = dataset.groupby('combination').apply(custom_agg) # Do custom aggregration  - Not needed when working on one cell-line but no difference in results
             
-            result_df.reset_index(drop=True, inplace=True)
+            # result_df.reset_index(drop=True, inplace=True)
             
             metrics.update(dict(test_result)) # Add test results to output files
             
-            metrics['synergy_combs'] = list(result_df['combination'])
-            metrics['synergy_mean'] = list(result_df['mean'])
-            metrics['synergy_std'] = list(result_df['std'])
+            # metrics['synergy_combs'] = list(result_df['combination'])
+            metrics['synergy_mean'] = list(synergy_mean)
+            metrics['synergy_std'] = list(synergy_std)
+
             
+            print("Test Result:", test_result)
             #metrics.update(dict(drug_combinations_synergy))
         
         return metrics
@@ -539,10 +548,11 @@ class ActiveTrainer(BasicTrainer):
 
         # Evaluate on valid set
         eval_metrics, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
-
+        
+        
         # Score unseen examples
         unseen_metrics, unseen_preds = self.eval_epoch(self.data, self.unseen_loader, self.model)
-
+        
         active_scores = self.acquisition.get_scores(unseen_preds)
 
         # Build summary
@@ -654,9 +664,8 @@ class ActiveTrainer(BasicTrainer):
         for _ in range(self.n_epoch_between_queries):
             # Perform several training epochs. Save only metrics from the last epoch
             train_metrics = self.train_epoch(self.data, train_loader, self.model, self.optim)
-
             early_stop_metrics, _ = self.eval_epoch(self.data, early_stop_loader, self.model)
-
+            
             if early_stop_metrics["comb_r_squared"] > best_eval_r2:
                 best_eval_r2 = early_stop_metrics["comb_r_squared"]
                 print("best early stop r2", best_eval_r2)
