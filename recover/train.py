@@ -68,12 +68,12 @@ def bayesian_train_epoch(data, loader, model, optim):
 
     epoch_loss = 0
     num_batches = len(loader)
+    batch = 1
 
     all_mean_preds = []
     all_targets = []
     
     kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
-    kl_weight = 0.01
 
     for _, drug_drug_batch in enumerate(loader):
         optim.zero_grad()
@@ -86,6 +86,9 @@ def bayesian_train_epoch(data, loader, model, optim):
 
         loss = model.loss(out, drug_drug_batch) #MSE
         kl = kl_loss(model)
+
+        kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1) #kl weight based on the paper "Weight Uncertainty in Neural Networks"
+        batch += 1
         
         cost = loss + kl_weight*kl
 
