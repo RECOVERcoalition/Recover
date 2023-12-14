@@ -29,6 +29,7 @@ predictor_config = {
     "predictor": MLPPredictor,
     "bayesian_predictor": True,
     "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "num_realizations": 10, # For bayesian uncertainty
     "predictor_layers":
         [
             2048,
@@ -37,7 +38,6 @@ predictor_config = {
             1,
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
-    "num_realizations": 10, # For bayesian uncertainty
     "allow_neg_eigval": True,
     "stop": {"training_iteration": 1000, 'patience': 10}
 }
