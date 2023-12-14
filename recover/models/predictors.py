@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import torchbnn as bnn
 from torch.nn import Parameter
 
 ########################################################################################################################
@@ -11,6 +12,15 @@ from torch.nn import Parameter
 class LinearModule(nn.Linear):
     def __init__(self, in_features, out_features, bias=True):
         super(LinearModule, self).__init__(in_features, out_features, bias)
+
+    def forward(self, input):
+        x, cell_line = input[0], input[1]
+        return [super().forward(x), cell_line]
+
+
+class BayesianLinearModule(bnn.BayesLinear):
+    def __init__(self, in_features, out_features, prior_mu=0, prior_sigma=0.01):
+        super(BayesianLinearModule, self).__init__(prior_mu=prior_mu, prior_sigma=prior_sigma, in_features=in_features, out_features=out_features)
 
     def forward(self, input):
         x, cell_line = input[0], input[1]
@@ -211,6 +221,125 @@ class BilinearMLPPredictor(torch.nn.Module):
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1)]
 
+########################################################################################################################
+# Bilinear MLP with Bayesian
+########################################################################################################################
+
+
+class BayesianBilinearMLPPredictor(torch.nn.Module):
+    def __init__(self, data, config, predictor_layers):
+
+        super(BayesianBilinearMLPPredictor, self).__init__()
+
+        self.num_cell_lines = len(data.cell_line_to_idx_dict.keys())
+        device_type = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(device_type)
+
+        self.layer_dims = predictor_layers
+
+        self.merge_n_layers_before_the_end = config["merge_n_layers_before_the_end"]
+        self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
+
+        assert 0 < self.merge_n_layers_before_the_end < len(predictor_layers)
+
+        layers_before_merge = []
+        layers_after_merge = []
+
+        # Build early layers (before addition of the two embeddings)
+        for i in range(len(self.layer_dims) - 1 - self.merge_n_layers_before_the_end):
+            layers_before_merge = self.add_layer(
+                layers_before_merge,
+                i,
+                self.layer_dims[i],
+                self.layer_dims[i + 1]
+            )
+
+        # Build last layers (after addition of the two embeddings)
+        for i in range(
+            len(self.layer_dims) - 1 - self.merge_n_layers_before_the_end,
+            len(self.layer_dims) - 1,
+        ):
+
+            layers_after_merge = self.add_bayes_layer(
+                layers_after_merge,
+                i,
+                self.layer_dims[i],
+                self.layer_dims[i + 1]
+            )
+
+        self.before_merge_mlp = nn.Sequential(*layers_before_merge)
+        self.after_merge_mlp = nn.Sequential(*layers_after_merge)
+
+        # Number of bilinear transformations == the dimension of the layer at which the merge is performed
+        # Initialize weights close to identity
+        self.bilinear_weights = Parameter(
+            1 / 100 * torch.randn((self.merge_dim, self.merge_dim, self.merge_dim))
+            + torch.cat([torch.eye(self.merge_dim)[None, :, :]] * self.merge_dim, dim=0)
+        )
+        self.bilinear_offsets = Parameter(1 / 100 * torch.randn((self.merge_dim)))
+
+        self.allow_neg_eigval = config["allow_neg_eigval"]
+        if self.allow_neg_eigval:
+            self.bilinear_diag = Parameter(1 / 100 * torch.randn((self.merge_dim, self.merge_dim)) + 1)
+
+    def forward(self, data, drug_drug_batch):
+        h_drug_1, h_drug_2, cell_lines = self.get_batch(data, drug_drug_batch)
+
+        # Apply before merge MLP
+        h_1 = self.before_merge_mlp([h_drug_1, cell_lines])[0]
+        h_2 = self.before_merge_mlp([h_drug_2, cell_lines])[0]
+
+        # compute <W.h_1, W.h_2> = h_1.T . W.T.W . h_2
+        h_1 = self.bilinear_weights.matmul(h_1.T).T
+        h_2 = self.bilinear_weights.matmul(h_2.T).T
+
+        if self.allow_neg_eigval:
+            # Multiply by diagonal matrix to allow for negative eigenvalues
+            h_2 *= self.bilinear_diag
+
+        # "Transpose" h_1
+        h_1 = h_1.permute(0, 2, 1)
+
+        # Multiplication
+        h_1_scal_h_2 = (h_1 * h_2).sum(1)
+
+        # Add offset
+        h_1_scal_h_2 += self.bilinear_offsets
+
+        comb = self.after_merge_mlp([h_1_scal_h_2, cell_lines])[0]
+
+        return comb
+
+    def get_batch(self, data, drug_drug_batch):
+
+        drug_1s = drug_drug_batch[0][:, 0]  # Edge-tail drugs in the batch
+        drug_2s = drug_drug_batch[0][:, 1]  # Edge-head drugs in the batch
+        cell_lines = drug_drug_batch[1]  # Cell line of all examples in the batch
+
+        h_drug_1 = data.x_drugs[drug_1s]
+        h_drug_2 = data.x_drugs[drug_2s]
+
+        return h_drug_1, h_drug_2, cell_lines
+
+    def add_layer(self, layers, i, dim_i, dim_i_plus_1):
+        layers.extend(self.linear_layer(i, dim_i, dim_i_plus_1))
+        if i != len(self.layer_dims) - 2:
+            layers.append(ReLUModule())
+
+        return layers
+
+    def add_bayes_layer(self, layers, i, dim_i, dim_i_plus_1):
+        layers.extend(self.bayes_linear_layer(i, dim_i, dim_i_plus_1))
+        if i != len(self.layer_dims) - 2:
+            layers.append(ReLUModule())
+
+        return layers
+
+    def linear_layer(self, i, dim_i, dim_i_plus_1):
+        return [LinearModule(dim_i, dim_i_plus_1)]
+        
+    def bayes_linear_layer(self, i, dim_i, dim_i_plus_1):
+        return [BayesianLinearModule(dim_i, dim_i_plus_1)]
 
 ########################################################################################################################
 # Bilinear MLP with Film conditioning
