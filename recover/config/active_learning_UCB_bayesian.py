@@ -3,7 +3,7 @@ from recover.models.models import Baseline, EnsembleModel
 from recover.models.predictors import BilinearFilmMLPPredictor, \
     BilinearMLPPredictor, BilinearFilmWithFeatMLPPredictor, BayesianBilinearMLPPredictor #, BilinearCellLineInputMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB
+from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB, ExpectedImprovementAcquisition
 from recover.train import train_epoch_bayesian, eval_epoch, test_epoch, BayesianBasicTrainer, BayesianActiveTrainer
 import os
 from ray import tune
@@ -38,7 +38,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
-    "stop": {"training_iteration": 1, 'patience': 10}
+    "stop": {"training_iteration": 1000, 'patience': 10}
 }
 
 model_config = {
@@ -76,7 +76,7 @@ dataset_config = {
 
 active_learning_config = {
     "ensemble_size": 10,
-    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]),
+    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition, ExpectedImprovementAcquisition]),
     "patience_max": 8,
     "kappa": 1,
     "kappa_decrease_factor": 1,
