@@ -72,6 +72,7 @@ def train_epoch_bayesian(data, loader, model, optim):
 
     all_mean_preds = []
     all_targets = []
+    batch = 1
 
     for _, drug_drug_batch in enumerate(loader):  
         optim.zero_grad()
@@ -84,7 +85,9 @@ def train_epoch_bayesian(data, loader, model, optim):
         
         #MSE is computed as in the original paper and is dependant on data
         loss_mse = model.loss(out, drug_drug_batch)
-        kl_weight = 0.01
+        
+        kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1) #kl weight based on the paper "Weight Uncertainty in Neural Networks"
+        batch += 1
         
         #KL loss depends on the entire model 
         kl = kl_loss(model)
