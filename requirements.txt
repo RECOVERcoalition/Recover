@@ -8,3 +8,4 @@ umap-learn
 numpy==1.22.4
 pandas
 scipy
+torchbnn
