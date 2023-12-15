@@ -6,9 +6,20 @@ This repository is an implementation of RECOVER, a platform that can guide wet l
 ([preprint](https://arxiv.org/abs/2202.04202)), howerver instead of using an ensemble model to get Synergy predictions with uncertainty, we used multiple realization of a Bayesian Neural Network model. 
 Since the weights are drawn from a distribution, they differ for every run of a trained model and hence give different results. The goal was to get a more precise uncertainty and achieve i quicker since the model doesn't have to be trained multiple times. 
 
-<div>
-  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="500"/>
-</div>
+<p float="left">
+  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="300"/>
+  <img src="docs/images/ModelOverview.png" alt="Model Overview" width="400"/>
+</p>
+
+## Repository overview
+There are 4 branches in this Git Repository.
+
+**Master**, where the original RECOVER is stored with Bayesian setup but original config files, so the initial pipeline can be easily recreated.   
+**Bayesian_after_merge**, with a Bayesian model used only in the layers after the bilinear merge.   
+**Bayesian_before_and_after_merge**, with a Bayesian model used in the layers before and after the bilinear merge.  
+**Weight_uncertainty**, a Bayesian Neural Network library implemented from scratch and two priors introduced in order to optimize the model. (https://doi.org/10.48550/arXiv.1505.05424)  
+
+Every branch will be further explaned in its own README.
 
 ## Environment setup
 
