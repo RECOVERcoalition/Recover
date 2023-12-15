@@ -12,7 +12,7 @@ Since the weights are drawn from a distribution, they differ for every run of a 
 </p>
 
 ## Repository overview
-There are 6 branches in this Git Repository.
+There are 4 branches in this Git Repository.
 
 **Master**, where the original RECOVER is stored with Bayesian setup but original config files, so the initial pipeline can be easily recreated.   
 **Bayesian_after_merge**, with a Bayesian model used only in the layers after the bilinear merge.   
