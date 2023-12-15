@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from scipy.special import erf
+from scipy.stats import norm
 
 ########################################################################################################################
 # Abstract Acquisition
@@ -25,8 +26,12 @@ class AbstractAcquisition:
         std = output.std(dim=1)
         return mean, std
 
-    def get_best(self, output):
+    """
+    The max synergy is considered as current best since we don't have access to ground truth
+    """
+    def get_current_best(self, output):
         best, _ = output.max(dim=1)
+        
         
         return best
 
@@ -41,7 +46,7 @@ class ExpectedImprovementAcquisition(AbstractAcquisition):
         
     def get_scores(self, output):
         mean, std = self.get_mean_and_std(output)
-        best = self.get_best(output)
+        best = self.get_current_best(output)
         epsilon = 1e-6
         
         z = (mean-best-epsilon)/(std+epsilon)
@@ -58,6 +63,24 @@ class RandomAcquisition(AbstractAcquisition):
 
     def get_scores(self, output):
         return torch.randn(output.shape[0])
+        
+
+class ProbabilityOfImprovementAcquisition(AbstractAcquisition):
+    """
+    Probability of Improvement Aquisition Function
+    
+    """
+    def __init__(self, config):
+        super().__init__(config)
+        
+    def get_scores(self, output):
+        mean, std = self.get_mean_and_std(output)
+        current_best = self.get_current_best(output)
+        
+        z = (mean - current_best) / std
+        prob_of_improvement_scores = norm.cdf(z)
+
+        return torch.tensor(prob_of_improvement_scores).to("cpu")
 
 
 class UCB(AbstractAcquisition):

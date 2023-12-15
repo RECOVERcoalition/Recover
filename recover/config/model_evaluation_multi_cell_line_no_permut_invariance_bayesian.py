@@ -37,7 +37,8 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
-    "stop": {"training_iteration": 5, 'patience': 10} #in order to check when the training in over, we parse these arguments
+    "stop": {"training_iteration": 1000, 'patience': 10}, #in order to check when the training in over, we parse these arguments
+    "realizations": 10 #define the number of realizations
 }
 
 model_config = {
@@ -74,7 +75,7 @@ configuration = {
     },
     "summaries_dir": os.path.join(get_project_root(), "RayLogs"),
     "memory": 1800,
-    "stop": {"training_iteration": 5, 'patience': 10},
+    "stop": {"training_iteration": 1000, 'patience': 10},
     "checkpoint_score_attr": 'eval/comb_r_squared',
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
