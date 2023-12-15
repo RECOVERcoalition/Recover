@@ -7,8 +7,8 @@ This repository is an implementation of RECOVER, a platform that can guide wet l
 Since the weights are drawn from a distribution, they differ for every run of a trained model and hence give different results. The goal was to get a more precise uncertainty and achieve i quicker since the model doesn't have to be trained multiple times. 
 
 <p float="left">
-  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="400"/>
-  <img src="docs/images/ModelOverview.png" alt="Model Overview" width="500"/>
+  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="300"/>
+  <img src="docs/images/ModelOverview.png" alt="Model Overview" width="400"/>
 </p>
 
 ## Repository overview
