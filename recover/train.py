@@ -728,6 +728,7 @@ class ActiveTrainerBayesian(BasicTrainer):
         self.acquire_n_at_a_time = config["acquire_n_at_a_time"]
         self.acquisition = config["acquisition"](config)
         self.n_epoch_between_queries = config["n_epoch_between_queries"]
+        self.num_realizations = config["num_realizations"]
 
         # randomly acquire data at the beginning
         self.seen_idxs = self.train_idxs[:config["n_initial"]]
@@ -765,7 +766,7 @@ class ActiveTrainerBayesian(BasicTrainer):
         unseen_metrics = {}
         realization_results, unseen_preds, drug_combs = self.eval_epoch(self.data, self.unseen_loader, self.model)
         unseen_result = dict([("unseen/" + k, [v]) for k, v in realization_results.items()])
-        for i in range(9):
+        for i in range(self.num_realizations - 1):
             realization_results, result_tensor, _ = self.eval_epoch(self.data, self.unseen_loader, self.model)
             unseen_preds = torch.cat((unseen_preds, result_tensor), dim=1)
             for k, v in realization_results.items():
