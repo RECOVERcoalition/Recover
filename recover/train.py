@@ -11,15 +11,15 @@ import numpy as np
 import importlib
 from scipy import stats
 from scipy.stats import spearmanr
-import torchbnn as bnn #adding a Bayesian NN library
+import torchbnn as bnn
 import tempfile
 
 
 ########################################################################################################################
 # Epoch loops
 ########################################################################################################################
-
-
+ 
+ 
 def train_epoch(data, loader, model, optim):
 
     model.train()
@@ -55,8 +55,8 @@ def train_epoch(data, loader, model, optim):
     print("Training", summary_dict)
 
     return summary_dict
-
-
+    
+    
 #training epoch for BNN using KL divergence for loss
 
 def train_epoch_bayesian(data, loader, model, optim):
@@ -136,7 +136,7 @@ def eval_epoch(data, loader, model):
             all_out.append(out)
             all_mean_preds.extend(out.mean(dim=1).tolist())
             all_targets.extend(drug_drug_batch[2].tolist())
-
+            
             loss = model.loss(out, drug_drug_batch)
             epoch_loss += loss.item()
 
@@ -150,11 +150,11 @@ def eval_epoch(data, loader, model):
     }
 
     print("Validation", summary_dict, '\n')
-
+ 
     all_out = torch.cat(all_out)
 
     return summary_dict, all_out
-
+    
 
 #testing epoch for realizations od the trained model   
 def test_epoch(data, loader, model):
@@ -199,7 +199,7 @@ def test_epoch(data, loader, model):
     
     #returning drugs and predictions
     return summary_dict, all_out, drugs, all_mean_preds
-    
+
 
 ########################################################################################################################
 # Basic trainer
@@ -325,7 +325,7 @@ class BasicTrainer(tune.Trainable):
     def load_checkpoint(self, checkpoint_path):
         self.model.load_state_dict(torch.load(checkpoint_path))
         
-        
+
 ########################################################################################################################
 # Bayesian basic trainer
 ########################################################################################################################
@@ -429,6 +429,7 @@ class BayesianBasicTrainer(tune.Trainable):
         #saving the stopping points so we know when the training has stoped and the model can be tested
         self.patience_stop = config["stop"]["patience"]
         self.iterations_stop = config["stop"]["training_iteration"]
+        self.realizations = config["realizations"] #get the number of realizations 
 
     def step(self):
 
@@ -462,7 +463,7 @@ class BayesianBasicTrainer(tune.Trainable):
             results = []
             r_squared = []
             spearman = []
-            for i in range(10): #define the number of realizations 
+            for i in range(self.realizations): 
                 #calling the test_epoch to obtain the results
                 test_metrics, _, drugs, result = self.test_epoch(self.data, self.test_loader, self.model)
                 #saving results and metrics from each realization in order to compute uncertainty
@@ -546,7 +547,7 @@ class ActiveTrainer(BasicTrainer):
 
         # Score unseen examples
         unseen_metrics, unseen_preds = self.eval_epoch(self.data, self.unseen_loader, self.model)
-
+        
         active_scores = self.acquisition.get_scores(unseen_preds)
 
         # Build summary
@@ -563,7 +564,7 @@ class ActiveTrainer(BasicTrainer):
         # Acquire new data
         print("query data")
         query = self.unseen_idxs[torch.argsort(active_scores, descending=True)[:self.acquire_n_at_a_time]]
-
+   
         # Get the best score among unseen examples
         self.best_score = self.data.ddi_edge_response[self.unseen_idxs].max().detach().cpu()
         # remove the query from the unseen examples
@@ -689,13 +690,13 @@ class ActiveTrainer(BasicTrainer):
 
         unseen_loader = DataLoader(
             unseen_ddi_dataset,
-            batch_size=self.batch_size,
+            batch_size=self.batch_size, 
             shuffle=False,
             pin_memory=(self.device == "cpu"),
         )
 
         return seen_loader, unseen_loader
-        
+
 
 ########################################################################################################################
 # Bayesian Active learning Trainer
@@ -715,6 +716,7 @@ class BayesianActiveTrainer(BayesianBasicTrainer):
         self.acquire_n_at_a_time = config["acquire_n_at_a_time"]
         self.acquisition = config["acquisition"](config)
         self.n_epoch_between_queries = config["n_epoch_between_queries"]
+        self.realizations = config["realizations"] #get the number of realizations
 
         # randomly acquire data at the beginning
         self.seen_idxs = self.train_idxs[:config["n_initial"]]
@@ -756,7 +758,7 @@ class BayesianActiveTrainer(BayesianBasicTrainer):
         results = []
         r_squared = []
         spearman = []
-        for i in range(10):
+        for i in range(self.realizations):
             unseen_metrics, _, drugs, result = self.test_epoch(self.data, self.unseen_loader, self.model)
             results.append(result)
             r_squared.append(unseen_metrics['comb_r_squared'])
@@ -937,11 +939,11 @@ class BayesianActiveTrainer(BayesianBasicTrainer):
 def train(configuration):
     if configuration["trainer_config"]["use_tune"]:
         ###########################################
-        # Use tune
+        # Use tune 
         ###########################################
 
         ray.init(num_cpus=configuration["resources_per_trial"]["cpu"],
-                 num_gpus=configuration["resources_per_trial"]["gpu"])
+                 num_gpus=configuration["resources_per_trial"]["gpu"]) 
 
         time_to_sleep = 5
         print("Sleeping for %d seconds" % time_to_sleep)
