@@ -83,6 +83,7 @@ active_learning_config = {
     "n_epoch_between_queries": 500,
     "acquire_n_at_a_time": 30,
     "n_initial": 30,
+    "realizations": 10, #define the number of realizations instead of Ensemble Model
 }
 
 ########################################################################################################################
