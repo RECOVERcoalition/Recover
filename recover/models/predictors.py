@@ -133,7 +133,84 @@ class BayesianLinearModule(nn.Linear):
     def kl_loss(self):
         return self.log_variational_posterior - self.log_prior
 
+# class BayesianLineardropoutModule(nn.Linear): 
+#     def __init__(self, in_features, out_features, input_dropout=0.8, hidden_dropout=0.5):
+#         super().__init__(in_features, out_features) #BayesianLinearModule, self
+#         self.in_features = in_features
+#         self.out_features = out_features
+#         self.input_dropout = input_dropout
+#         self.hidden_dropout = hidden_dropout
+#         # Weight parameters
+#         self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-0.2, 0.2))
+#         self.weight_rho = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-5,-4))
+#         #self.weight = Gaussian(self.weight_mu, self.weight_rho)
+#         # Bias parameters
+#         self.bias_mu = nn.Parameter(torch.Tensor(out_features).uniform_(-0.2, 0.2))
+#         self.bias_rho = nn.Parameter(torch.Tensor(out_features).uniform_(-5,-4))
+     
+#         # Prior distributions
+#         self.weight_prior = ScaleMixtureGaussian(PI, SIGMA_1, SIGMA_2)
+#         self.bias_prior = ScaleMixtureGaussian(PI, SIGMA_1, SIGMA_2)
+#         self.log_prior = 0
+#         self.log_variational_posterior = 0
 
+#         # Dropout layers
+#         self.input_dropout_layer = nn.Dropout(p=self.input_dropout)
+#         self.hidden_dropout_layer = nn.Dropout(p=self.hidden_dropout)
+
+#     def sample_bias(self):
+#         epsilon = torch.distributions.Normal(0,1).sample(self.bias_rho.size())
+#         sigma = torch.log1p(torch.exp(self.bias_rho))
+#         return self.bias_mu + sigma * epsilon
+
+#     def sample_weight(self):
+#         epsilon = torch.distributions.Normal(0,1).sample(self.weight_rho.size())
+#         sigma = torch.log1p(torch.exp(self.weight_rho))
+#         return self.weight_mu + sigma * epsilon
+    
+#     def log_prob_bias(self, input):
+#         sigma = torch.log1p(torch.exp(self.bias_rho))
+#         return (-math.log(math.sqrt(2 * math.pi))
+#                 - torch.log(sigma)
+#                 - ((input - self.bias_mu) ** 2) / (2 * sigma ** 2)).sum()
+
+#     def log_prob_weight(self, input):
+#         sigma = torch.log1p(torch.exp(self.weight_rho))
+#         return (-math.log(math.sqrt(2 * math.pi))
+#                 - torch.log(sigma)
+#                 - ((input - self.weight_mu) ** 2) / (2 * sigma ** 2)).sum() 
+
+    
+#     def forward(self, input, sample=True):
+#         x, cell_line = input[0], input[1] #BAYESIAN ADD ON
+#         x = self.input_dropout_layer(x)
+        
+#         #new lines
+#         weight_mu = self.weight_mu
+#         weight_rho = self.weight_rho
+#         bias_mu = self.bias_mu
+#         bias_rho = self.bias_rho
+        
+#         weight = self.sample_weight()
+#         bias = self.sample_bias()
+
+
+#         if self.training and sample:
+            
+#             self.log_prior = self.weight_prior.log_prob(weight) + self.bias_prior.log_prob(bias)
+#             self.log_variational_posterior = self.log_prob_weight(weight) + self.log_prob_bias(bias)
+          
+#         else:
+#             self.log_prior, self.log_variational_posterior = torch.FloatTensor([0]), torch.FloatTensor([0])
+        
+#         # Apply hidden layer dropout
+#         x = self.hidden_dropout_layer(x)
+
+#         return [F.linear(x, weight, bias), cell_line]
+        
+    
+#     def kl_loss(self):
+#         return self.log_variational_posterior - self.log_prior
 
 ########################################################################################################################
 # Advanced Bayesian MLP
