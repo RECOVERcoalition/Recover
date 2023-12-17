@@ -12,11 +12,11 @@ Since the weights are drawn from a distribution, they differ for every run of a 
 
 
 ## Weighted Uncertainty in Bayesian Neural Networks
-Incorporating weighted uncertainty into Bayesian Neural Networks (BNNs) enhances their predictive capabilities, allowing for a more nuanced understanding of model confidence. Inspired by the research outlined in the article, the implementation focused on introducing weighted uncertainty through a Bayesian framework.
+Incorporating weighted uncertainty into Bayesian Neural Networks (BNNs) enhances their predictive capabilities, allowing for a more nuanced understanding of model confidence. Inspired by the research outlined in the article, the implementation focused on introducing weighted uncertainty through a Bayesian framework. Implemetation is inspired by ([preprint](https://github.com/nitarshan/bayes-by-backprop/tree/master))
 
 ### Implementation Details
 1. **Layers Module:**  
-   Implemented a versatile layers module within the `models/predictors.py` file, providing flexibility by incorporating both weighted uncertainty-enabled layers and traditional layers without dropout.
+   Implemented a versatile layers module within the `models/predictors.py` file, providing flexibility by incorporating both weighted uncertainty with and without dropout. Dropout method is inspired by ([preprint](https://github.com/bayesgroup/variational-dropout-sparsifies-dnn))
 
 2. **Bayesian Neural Network:**  
    Extended the predictive capabilities by incorporating a Bayesian Neural Network into the `models/predictors.py` file. This empowers the model to leverage uncertainty information for more informed predictions.
