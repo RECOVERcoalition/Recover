@@ -137,6 +137,10 @@ class BilinearMLPPredictor(torch.nn.Module):
         
         self.bayesian_predictor = config["bayesian_predictor"]
         self.bayesian_before_merge = config["bayesian_before_merge"]
+        self.sigmoid = False
+        if self.bayesian_predictor:
+            self.sigmoid = config["sigmoid"]
+            
         self.merge_n_layers_before_the_end = config["merge_n_layers_before_the_end"]
         self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
 
@@ -250,10 +254,13 @@ class BilinearMLPPredictor(torch.nn.Module):
 
     def add_bayes_layer(self, layers, i, dim_i, dim_i_plus_1):
         layers.extend(self.bayes_linear_layer(i, dim_i, dim_i_plus_1))
+        
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
-        else:
-            layers.append(ScaledSigmoid())
+            
+        if self.sigmoid:
+            if i == len(self.layer_dims) - 2:
+                layers.append(ScaledSigmoid())
 
         return layers
 
@@ -454,8 +461,13 @@ class MLPPredictor(torch.nn.Module):
         
     def add_bayes_layer(self, layers, i, dim_i, dim_i_plus_1):
         layers.extend(self.bayes_linear_layer(i, dim_i, dim_i_plus_1))
+        
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
+            
+        if self.sigmoid:
+            if i == len(self.layer_dims) - 2:
+                layers.append(ScaledSigmoid())
 
         return layers
         
