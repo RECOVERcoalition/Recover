@@ -9,6 +9,8 @@ Since the weights are drawn from a distribution, they differ for every run of a 
 <div>
   <img src="docs/images/ProjectInfographics.png" alt="Overview" width="500"/>
 </div>
+
+
 ## Weighted Uncertainty in Bayesian Neural Networks
 Incorporating weighted uncertainty into Bayesian Neural Networks (BNNs) enhances their predictive capabilities, allowing for a more nuanced understanding of model confidence. Inspired by the research outlined in the article, the implementation focused on introducing weighted uncertainty through a Bayesian framework.
 
