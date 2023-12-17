@@ -3,7 +3,7 @@ from recover.models.models import Baseline, EnsembleModel
 from recover.models.predictors import BilinearFilmMLPPredictor, \
     BilinearMLPPredictor, BilinearFilmWithFeatMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB, ProbabilityOfImprovementAcquisition
+from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB, ProbabilityOfImprovementAcquisition, ExpectedImprovementAcquisition
 from recover.train import train_epoch, eval_epoch, bayesian_train_epoch, bayesian_eval_epoch, BasicTrainer, ActiveTrainer, ActiveTrainerBayesian
 import os
 from ray import tune
@@ -30,6 +30,7 @@ predictor_config = {
     "predictor": BilinearMLPPredictor,
     "bayesian_predictor": True,
     "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "sigmoid": False,
     "num_realizations": 10, # For bayesian uncertainty
     "predictor_layers":
         [
@@ -77,8 +78,8 @@ dataset_config = {
 }
 
 active_learning_config = {
-    "ensemble_size": 5,
-    "acquisition": tune.grid_search([ProbabilityOfImprovementAcquisition, UCB, RandomAcquisition]),
+    "ensemble_size": 10,
+    "acquisition": tune.grid_search([ProbabilityOfImprovementAcquisition, UCB, ExpectedImprovementAcquisition]),
     "patience_max": 4,
     "kappa": 1,
     "kappa_decrease_factor": 1,
