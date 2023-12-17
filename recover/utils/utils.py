@@ -1,3 +1,4 @@
+import torch
 from pathlib import Path
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -31,6 +32,17 @@ def get_tensor_dataset(data, idxs):
 
     return TensorDataset(
         data.ddi_edge_idx[:, idxs].T,
+        data.ddi_edge_classes[idxs],
+        data.ddi_edge_response[idxs],
+    )
+    
+def get_tensor_dataset_swapped_combination(data, idxs):
+
+    combinations = data.ddi_edge_idx[:, idxs].T
+    reversed_tensor = torch.tensor(np.array([list(reversed(inner_list)) for inner_list in combinations]))
+
+    return TensorDataset(
+        reversed_tensor,
         data.ddi_edge_classes[idxs],
         data.ddi_edge_response[idxs],
     )

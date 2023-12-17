@@ -2,7 +2,7 @@ import torch
 import torchbnn as bnn
 import os
 from torch.utils.data import DataLoader
-from recover.utils.utils import get_tensor_dataset, trial_dirname_creator
+from recover.utils.utils import get_tensor_dataset, get_tensor_dataset_swapped_combination, trial_dirname_creator
 from torch.utils.data import random_split
 from ray import tune
 import ray
@@ -335,6 +335,8 @@ class BasicTrainer(tune.Trainable):
 class BayesianBasicTrainer(tune.Trainable):
     def setup(self, config):
         print("Initializing regular training pipeline")
+        
+        self.test_invariance = True 
 
         self.batch_size = config["batch_size"]
         self.num_realizations = config["num_realizations"]
@@ -458,11 +460,18 @@ class BayesianBasicTrainer(tune.Trainable):
         metrics['all_space_explored'] = 0                        
 
 
+        """
+        Start the test on unseen dataset once the training is Done
+        P.S. The combinations are unseen, this is not related to the drugs
+        """
         if ((self.patience >= self.patience_stop) | (self.training_it > self.max_iter)):
+            print("Test performance")
             test_result = {}
+            
             realization_results, result_synergy, drug_combs = self.eval_epoch(self.data, self.test_loader, self.model)
             drug_combinations_synergy = {'data': self.test_idxs}
             test_metrics = dict([("test/" + k, [v]) for k, v in realization_results.items()])
+            
             for i in range(num_realizations-1):
                 realization_results, new_synergy, _ = self.eval_epoch(self.data, self.test_loader, self.model)
                 result_synergy = torch.cat((result_synergy, new_synergy), dim=1)
@@ -492,7 +501,47 @@ class BayesianBasicTrainer(tune.Trainable):
             metrics['synergy_mean'] = list(synergy_mean)
             metrics['synergy_std'] = list(synergy_std)
             
-        
+            """
+            # Start the test on permuted unseen dataset - To confirm the invariance
+            # Change the test_invariance boolean in Trainer setup to enable/disable this part of the code
+            """
+            if self.test_invariance:
+            
+                print("Test on swapped combinations")
+                
+                test_ddi_dataset_swapped = get_tensor_dataset_swapped_combination(self.data, self.test_idxs)
+                permuted_test_loader = DataLoader(
+                    test_ddi_dataset_swapped,
+                    batch_size=self.batch_size
+                )
+                
+                swapped_test_result = {}
+                swapped_test_metrics = {}
+                
+                realization_results, result_synergy, drug_combs = self.eval_epoch(self.data, permuted_test_loader, self.model)
+                drug_combinations_synergy = {'data': self.test_idxs}
+                swapped_test_metrics = dict([("test_swapped/" + k, [v]) for k, v in realization_results.items()])
+                
+                for i in range(num_realizations-1):
+                    realization_results, new_synergy, _ = self.eval_epoch(self.data, self.test_loader, self.model)
+                    result_synergy = torch.cat((result_synergy, new_synergy), dim=1)
+                    for k, v in realization_results.items():
+                        swapped_test_metrics["test_swapped/" + k].append(v)
+                        
+                for key in swapped_test_metrics:
+                    swapped_test_result[str(key)+ "/mean"] = np.mean(swapped_test_metrics[key])
+                    swapped_test_result[str(key)+ "/std"] = np.std(swapped_test_metrics[key])
+                    
+                
+                synergy_mean = list(torch.mean(result_synergy, dim=1).numpy())
+                synergy_std = list(torch.std(result_synergy, dim=1).numpy())
+                
+                metrics.update(dict(swapped_test_result))
+                
+                metrics['synergy_combs_permuted'] = list(drug_combs)
+                metrics['synergy_mean_permuted'] = list(synergy_mean)
+                metrics['synergy_std_permuted'] = list(synergy_std)
+            
         return metrics
     
     
@@ -763,9 +812,11 @@ class ActiveTrainerBayesian(BasicTrainer):
         # Evaluate on valid set
         eval_metrics, _, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
         
+        # Test on test set for given number of realizations
         unseen_metrics = {}
         realization_results, unseen_preds, drug_combs = self.eval_epoch(self.data, self.unseen_loader, self.model)
         unseen_result = dict([("unseen/" + k, [v]) for k, v in realization_results.items()])
+
         for i in range(self.num_realizations - 1):
             realization_results, result_tensor, _ = self.eval_epoch(self.data, self.unseen_loader, self.model)
             unseen_preds = torch.cat((unseen_preds, result_tensor), dim=1)
