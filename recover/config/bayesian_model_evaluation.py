@@ -15,7 +15,7 @@ from importlib import import_module
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([2, 3, 42]),
+    "seed": tune.grid_search([1, 2, 3, 42]),
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
@@ -29,6 +29,7 @@ predictor_config = {
     "predictor": BilinearMLPPredictor,
     "bayesian_predictor": True,
     "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "sigmoid": True,
     "num_realizations": 10, # For bayesian uncertainty
     "predictor_layers":
         [
