@@ -9,7 +9,26 @@ Since the weights are drawn from a distribution, they differ for every run of a 
 <div>
   <img src="docs/images/ProjectInfographics.png" alt="Overview" width="500"/>
 </div>
+## Weighted Uncertainty in Bayesian Neural Networks
+Incorporating weighted uncertainty into Bayesian Neural Networks (BNNs) enhances their predictive capabilities, allowing for a more nuanced understanding of model confidence. Inspired by the research outlined in the article, the implementation focused on introducing weighted uncertainty through a Bayesian framework.
 
+### Implementation Details
+1. **Layers Module:**  
+   Implemented a versatile layers module within the `models/predictors.py` file, providing flexibility by incorporating both weighted uncertainty-enabled layers and traditional layers without dropout.
+
+2. **Bayesian Neural Network:**  
+   Extended the predictive capabilities by incorporating a Bayesian Neural Network into the `models/predictors.py` file. This empowers the model to leverage uncertainty information for more informed predictions.
+
+3. **KL Loss Method:**  
+   Implemented the Kullback-Leibler (KL) loss method, as suggested by the article, within the `models/predictors.py` file. This addition is crucial for training the Bayesian model effectively, ensuring convergence to a meaningful weight distribution.
+
+4. **Configuration Files:**  
+   Introduced configuration files tailored for the Bayesian basic trainer and active trainer in the `config` directory. These files capture the necessary settings for training Bayesian models, providing a clear and organized structure for experimentation.
+
+5. **Codebase Modifications:**  
+   Ensured seamless integration by making necessary adjustments in the `train.py` and `models/model.py` files. These modifications align the training process with the new Bayesian approach, allowing for the proper utilization of weighted uncertainty.
+
+The implemented changes collectively enhance the expressiveness and reliability of the Bayesian Neural Network, paving the way for improved model interpretability and performance. By enabling weighted uncertainty, the model gains the ability to assign varying degrees of importance to different data points during training, ultimately leading to more robust and accurate predictions.
 ## Environment setup
 
 **Requirements and Installation**: 
