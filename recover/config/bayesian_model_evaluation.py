@@ -29,7 +29,7 @@ predictor_config = {
     "predictor": BilinearMLPPredictor,
     "bayesian_predictor": True,
     "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
-    "sigmoid": True,
+    "sigmoid": False,
     "num_realizations": 10, # For bayesian uncertainty
     "predictor_layers":
         [
@@ -60,7 +60,10 @@ dataset_config = {
     "cell_line": 'MCF7',  # 'PC-3',
     "target": "bliss_max",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
     "fp_bits": 1024,
-    "fp_radius": 2
+    "fp_radius": 2,
+    "add_noise": True,
+    "noise_type": 'salt_pepper', # 'gaussian', 'salt_pepper', 'random'
+    "noise_prop": 0.1,
 }
 
 ########################################################################################################################
