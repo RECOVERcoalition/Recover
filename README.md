@@ -24,7 +24,16 @@ Every branch will be further explaned in its own README.
 ## Environment setup
 
 **Requirements and Installation**: 
-For all the requirements and installation steps check th orginal RECOVER repository (https://github.com/RECOVERcoalition/Recover.git). 
+For all the requirements and installation steps dataset and the project check the orginal RECOVER repository (https://github.com/RECOVERcoalition/Recover.git). 
+
+**Potential issues and fixes**
+- Use the requirements file from this Repository
+- Cloning dataset: Makesure to install Git LFS (Since there are some files over 100 MB git-lfs is needed for cloning.)
+- Numpy 1.24 does not support - Even though there was no mention about the numpy version in original RECOVER requirements there are some compatibility issues when using other libraries therefore we have to specifically downgrade numpy to make it working without any issues. Try, pip install numpy==1.22.4
+- Ray tune issue: Use the updated train.py within this repo to avoid ray tune path issues when saving checkpoints
+- Issues with the config files: Check for such unused modules which are imported and remove them to avoid module not fount errors. 
+- rdkit installation path in original Repository is outdated. Try, conda install -c conda-forge rdkit 
+
 
 ## Running the pipeline
 
