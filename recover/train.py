@@ -3,6 +3,7 @@ import torchbnn as bnn
 import os
 from torch.utils.data import DataLoader
 from recover.utils.utils import get_tensor_dataset, get_tensor_dataset_swapped_combination, trial_dirname_creator
+from recover.utils.utils import add_gaussian_noise, add_random_noise, add_salt_and_pepper_noise
 from torch.utils.data import random_split
 from ray import tune
 import ray
@@ -343,6 +344,16 @@ class BayesianBasicTrainer(tune.Trainable):
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device_type)
         self.training_it = 0
+        self.add_noise = False
+        
+        try:
+            self.add_noise = config["add_noise"]
+            self.noise_type = config["noise_type"]
+            self.noise_prop = config["noise_prop"]
+        except Exception as e:
+            self.noise_type = None
+            self.noise_prop = 0.1
+        
 
         # Initialize dataset
         dataset = config["dataset"](
@@ -376,6 +387,15 @@ class BayesianBasicTrainer(tune.Trainable):
 
         # Train loader
         train_ddi_dataset = get_tensor_dataset(self.data, self.train_idxs)
+        
+        if self.add_noise:
+            if self.noise_type == 'gaussian':
+                train_ddi_dataset = add_gaussian_noise(self.data, self.train_idxs, self.noise_prop)
+            elif self.noise_type == 'salt_pepper':
+                train_ddi_dataset = add_salt_and_pepper_noise(self.data, self.train_idxs, self.noise_prop)
+            else :
+                train_ddi_dataset = add_random_noise(self.data, self.train_idxs, self.noise_prop)
+            
 
         self.train_loader = DataLoader(
             train_ddi_dataset,
@@ -816,7 +836,7 @@ class ActiveTrainerBayesian(BasicTrainer):
         unseen_metrics = {}
         realization_results, unseen_preds, drug_combs = self.eval_epoch(self.data, self.unseen_loader, self.model)
         unseen_result = dict([("unseen/" + k, [v]) for k, v in realization_results.items()])
-
+        
         for i in range(self.num_realizations - 1):
             realization_results, result_tensor, _ = self.eval_epoch(self.data, self.unseen_loader, self.model)
             unseen_preds = torch.cat((unseen_preds, result_tensor), dim=1)
