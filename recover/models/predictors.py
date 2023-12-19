@@ -218,10 +218,11 @@ class BayesianLinearDropoutModule(nn.Linear):
         super().__init__(in_features, out_features) #BayesianLinearModule, self
         self.in_features = in_features
         self.out_features = out_features
+        
         # Weight parameters
         self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-0.2, 0.2))
         self.weight_rho = nn.Parameter(torch.Tensor(out_features, in_features).uniform_(-5,-4))
-        #self.weight = Gaussian(self.weight_mu, self.weight_rho)
+        
         # Bias parameters
         self.bias_mu = nn.Parameter(torch.Tensor(out_features).uniform_(-0.2, 0.2))
         self.bias_rho = nn.Parameter(torch.Tensor(out_features).uniform_(-5,-4))
@@ -267,27 +268,34 @@ class BayesianLinearDropoutModule(nn.Linear):
         weight = self.sample_weight()
         bias = self.sample_bias()
 
+        weight = self.sample_weight()
+        bias = self.sample_bias()
+
+        # Calculate log_alpha as in SVDO
+        log_alpha = weight_rho * 2.0 - 2.0 * torch.log(1e-16 + torch.abs(weight_mu))
+        self.log_alpha = torch.clamp(self.log_alpha, -10, 10)
+
 
         if self.training and sample:
             # Apply SVDO during training
             # Sample weights using the reparameterization trick
-            epsilon_weight = torch.distributions.Normal(0, 1).sample(self.weight_rho.size())
-            sigma_weight = torch.log1p(torch.exp(self.weight_rho))
-            weight = weight_mu + sigma_weight * epsilon_weight
 
-            epsilon_bias = torch.distributions.Normal(0, 1).sample(self.bias_rho.size())
-            sigma_bias = torch.log1p(torch.exp(self.bias_rho))
-            bias = bias_mu + sigma_bias * epsilon_bias
-
-            # Compute log probabilities for KL loss
+            # During training, sample from a distribution with mean and standard deviation based on weights
+            weight = weight_mu + torch.randn_like(weight_mu) * torch.exp(log_alpha)
+            bias = bias_mu + torch.randn_like(bias_mu) * torch.exp(bias_rho)
             self.log_prior = self.weight_prior.log_prob(weight) + self.bias_prior.log_prob(bias)
             self.log_variational_posterior = (
+                - 0.5 * torch.sum(1 + 2 * log_alpha - log_alpha.exp().pow(2) - weight_mu.pow(2)) +
                 self.log_prob_weight(weight) + self.log_prob_bias(bias)
-            )
+)
+            # # Compute log probabilities for KL loss
+            # self.log_prior = self.weight_prior.log_prob(weight) + self.bias_prior.log_prob(bias)
+            # self.log_variational_posterior = (
+            #     self.log_prob_weight(weight) + self.log_prob_bias(bias)
+            # )
         else:
             # During evaluation or when sample=False, use expected values
-            weight = weight_mu
-            bias = bias_mu
+
             self.log_prior, self.log_variational_posterior = (
                 torch.FloatTensor([0]),
                 torch.FloatTensor([0]),
@@ -429,13 +437,13 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         # layers.append(BayesianLinearModule(dim_i, dim_i_plus_1))
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
-        else:
-            # layers.append(nn.Sigmoid() * 100)
-            layers.append(ScaledSigmoid(scale_factor=100))
+        # else:
+        #     # layers.append(nn.Sigmoid() * 100)
+        #     layers.append(ScaledSigmoid(scale_factor=100))
         return layers
 
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
-        return [BayesianLinearDropoutModule(dim_i, dim_i_plus_1)]
+        return [BayesianLinearModule(dim_i, dim_i_plus_1)]
         # return [BayesianLinearModule(dim_i, dim_i_plus_1)]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):

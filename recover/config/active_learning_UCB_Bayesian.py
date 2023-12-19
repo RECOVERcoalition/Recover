@@ -3,7 +3,7 @@ from recover.models.models import Baseline, EnsembleModel
 from recover.models.predictors import AdvancedBayesianBilinearMLPPredictor
 from recover.utils.utils import get_project_root
 from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB
-from recover.train import train_epoch_bayesian, eval_epoch, BayesianBasicTrainer, BayesianActiveTrainer, ActiveTrainer
+from recover.train import train_epoch_bayesian, eval_epoch, BayesianBasicTrainer, ActiveTrainer
 import os
 from ray import tune
 
@@ -36,7 +36,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
-    "stop": {"training_iteration": 1000, 'patience': 10}
+    "stop": {"training_iteration": 1000, 'patience': 4}
 }
 
 model_config = {
@@ -81,6 +81,8 @@ active_learning_config = {
     "n_epoch_between_queries": 500,
     "acquire_n_at_a_time": 30,
     "n_initial": 30,
+    # "threshold": 1,  # Initial threshold for improvement
+    # "threshold_decrease_factor": 1,  # Factor to decrease the threshold
 }
 
 ########################################################################################################################
