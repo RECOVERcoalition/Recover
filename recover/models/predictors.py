@@ -268,41 +268,20 @@ class BayesianLinearDropoutModule(nn.Linear):
         weight = self.sample_weight()
         bias = self.sample_bias()
 
-        weight = self.sample_weight()
-        bias = self.sample_bias()
-
         # Calculate log_alpha as in SVDO
         log_alpha = weight_rho * 2.0 - 2.0 * torch.log(1e-16 + torch.abs(weight_mu))
-        self.log_alpha = torch.clamp(self.log_alpha, -10, 10)
-
+        self.log_alpha = torch.clamp(log_alpha, -10, 10)
 
         if self.training and sample:
-            # Apply SVDO during training
-            # Sample weights using the reparameterization trick
-
-            # During training, sample from a distribution with mean and standard deviation based on weights
-            weight = weight_mu + torch.randn_like(weight_mu) * torch.exp(log_alpha)
-            bias = bias_mu + torch.randn_like(bias_mu) * torch.exp(bias_rho)
+            
             self.log_prior = self.weight_prior.log_prob(weight) + self.bias_prior.log_prob(bias)
-            self.log_variational_posterior = (
-                - 0.5 * torch.sum(1 + 2 * log_alpha - log_alpha.exp().pow(2) - weight_mu.pow(2)) +
-                self.log_prob_weight(weight) + self.log_prob_bias(bias)
-)
-            # # Compute log probabilities for KL loss
-            # self.log_prior = self.weight_prior.log_prob(weight) + self.bias_prior.log_prob(bias)
-            # self.log_variational_posterior = (
-            #     self.log_prob_weight(weight) + self.log_prob_bias(bias)
-            # )
+            self.log_variational_posterior = self.log_prob_weight(weight) + self.log_prob_bias(bias)
+          
         else:
-            # During evaluation or when sample=False, use expected values
+            self.log_prior, self.log_variational_posterior = torch.FloatTensor([0]), torch.FloatTensor([0])
 
-            self.log_prior, self.log_variational_posterior = (
-                torch.FloatTensor([0]),
-                torch.FloatTensor([0]),
-            )
-        return [F.linear(x, weight, bias), cell_line]
+        return [F.linear(x, weight* (self.log_alpha < 3).float(), bias), cell_line]
         
-    
     def kl_loss(self):
         return self.log_variational_posterior - self.log_prior
 ########################################################################################################################
@@ -443,8 +422,8 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         return layers
 
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
+        # return [BayesianLinearDropoutModule(dim_i, dim_i_plus_1)]
         return [BayesianLinearModule(dim_i, dim_i_plus_1)]
-        # return [BayesianLinearModule(dim_i, dim_i_plus_1)]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1)]
