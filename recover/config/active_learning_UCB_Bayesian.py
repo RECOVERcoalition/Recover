@@ -2,8 +2,9 @@ from recover.datasets.drugcomb_matrix_data import DrugCombMatrix
 from recover.models.models import Baseline, EnsembleModel
 from recover.models.predictors import AdvancedBayesianBilinearMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB
-from recover.train import train_epoch_bayesian, eval_epoch, BayesianBasicTrainer, BayesianActiveTrainer, ActiveTrainer
+from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB,\
+ProbabilityOfImprovementAcquisition, ExpectedImprovementAcquisition
+from recover.train import train_epoch_bayesian, eval_epoch, BayesianBasicTrainer, ActiveTrainer
 import os
 from ray import tune
 
@@ -15,7 +16,7 @@ from ray import tune
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([1, 2, 3]),
+    "seed": tune.grid_search([1]), #([1, 2, 3]),
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
@@ -36,7 +37,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
-    "stop": {"training_iteration": 1000, 'patience': 10}
+    "stop": {"training_iteration": 1000, 'patience': 4}
 }
 
 model_config = {
@@ -74,13 +75,15 @@ dataset_config = {
 
 active_learning_config = {
     "ensemble_size": 5,
-    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]),
+    "acquisition": tune.grid_search([RandomAcquisition]), #ProbabilityOfImprovementAcquisition, UCB, ExpectedImprovementAcquisition]), #([GreedyAcquisition, UCB, RandomAcquisition]),
     "patience_max": 4,
     "kappa": 1,
     "kappa_decrease_factor": 1,
     "n_epoch_between_queries": 500,
     "acquire_n_at_a_time": 30,
     "n_initial": 30,
+    # "threshold": 1,  # Initial threshold for improvement
+    # "threshold_decrease_factor": 1,  # Factor to decrease the threshold
 }
 
 ########################################################################################################################
