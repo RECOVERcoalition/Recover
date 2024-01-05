@@ -3,7 +3,7 @@ from recover.models.models import Baseline
 from recover.models.predictors import BilinearFilmMLPPredictor, AdvancedBayesianBilinearMLPPredictor,\
  LinFilmWithFeatMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.train import train_epoch_bayesian,  BayesianBasicTrainer,\
+from recover.train import train_epoch,  BayesianBasicTrainer,\
 eval_epoch, BasicTrainer
 import os
 from ray import tune
@@ -29,6 +29,9 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": LinFilmWithFeatMLPPredictor,
+    "bayesian_predictor": False,
+    "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "num_realizations": 0, 
     "predictor_layers":
         [
             2048,
@@ -38,6 +41,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
+    "stop": {"training_iteration": 1000, 'patience': 10}
 }
 
 model_config = {
