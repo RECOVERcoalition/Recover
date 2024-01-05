@@ -56,7 +56,8 @@ class FilmModule(torch.nn.Module):
             cell_line]
 
 
-class FilmWithFeatureModule(nn.Module):
+class FilmWithFeatureModule(torch.nn.Module):
+
     def __init__(self, num_cell_line_features, out_dim):
         super(FilmWithFeatureModule, self).__init__()
 
@@ -80,6 +81,7 @@ class FilmWithFeatureModule(nn.Module):
             + condit[:, self.out_dim:],
             cell_line_features
         ]
+
 
 
 class LinearFilmWithFeatureModule(nn.Module):
@@ -125,7 +127,7 @@ class ScaleMixtureGaussian(object): #scale mixture Gaussian
 # Hyperparameters for the mixture model
 PI =  0.25
 SIGMA_1 = torch.FloatTensor([math.exp(-0)]) #torch.FloatTensor([0.005]) #
-SIGMA_2 = torch.FloatTensor([math.exp(-5)])
+SIGMA_2 = torch.FloatTensor([math.exp(-6)])
 
 class BayesianLinearModule(nn.Linear):
     def __init__(self, in_features, out_features):
@@ -513,8 +515,8 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
 # Bilinear MLP
 ########################################################################################################################
 
-
 class BilinearMLPPredictor(nn.Module):
+
     def __init__(self, data, config, predictor_layers):
 
         super(BilinearMLPPredictor, self).__init__()
@@ -667,7 +669,6 @@ class BilinearLinFilmWithFeatMLPPredictor(BilinearFilmWithFeatMLPPredictor):
 # No permutation invariance MLP with Bayesian
 ########################################################################################################################
 
-
 class BayesianMLPPredictor(nn.Module):
     def __init__(self, data, config, predictor_layers):
 
@@ -777,7 +778,6 @@ class BayesianMLPPredictor(nn.Module):
 ########################################################################################################################
 # No permutation invariance MLP 
 ########################################################################################################################
-
 
 class MLPPredictor(nn.Module):
     def __init__(self, data, config, predictor_layers):
@@ -904,8 +904,8 @@ class LinFilmWithFeatMLPPredictor(FilmWithFeatMLPPredictor):
 # Deep Synergy
 ########################################################################################################################
 
-
 class DeepSynergyPredictor(nn.Module):
+
     def __init__(self, data, config, predictor_layers):
         super(DeepSynergyPredictor, self).__init__()
 

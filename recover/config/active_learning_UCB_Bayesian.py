@@ -28,6 +28,7 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": AdvancedBayesianBilinearMLPPredictor,
+    "num_realizations": 5,
     "predictor_layers":
         [
             2048,
@@ -91,7 +92,7 @@ active_learning_config = {
 ########################################################################################################################
 
 configuration = {
-    "trainer": ActiveTrainer, #BayesianActiveTrainer,  # PUT NUM GPU BACK TO 1
+    "trainer": ActiveTrainer,  # PUT NUM GPU BACK TO 1
     "trainer_config": {
         **pipeline_config,
         **predictor_config,

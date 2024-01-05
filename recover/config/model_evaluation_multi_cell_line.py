@@ -17,7 +17,9 @@ from importlib import import_module
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([2]),
+    "seed": tune.grid_search([2,3,4]),
+
+    
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
