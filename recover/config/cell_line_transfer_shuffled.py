@@ -23,12 +23,13 @@ pipeline_config = {
     "weight_decay": 1e-2,
     "batch_size": 128,
     # Train epoch and eval_epoch to use
-    "train_epoch": train_epoch,
+    "train_epoch": train_epoch_bayesian,
     "eval_epoch": eval_epoch,
 }
 
 predictor_config = {
     "predictor": ShuffledBilinearLinFilmWithFeatMLPPredictor,
+    "num_realizations": 10, 
     "predictor_layers":
         [
             2048,
@@ -38,6 +39,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
+    "stop": {"training_iteration": 1000, 'patience': 10}
 }
 
 model_config = {
@@ -66,7 +68,7 @@ dataset_config = {
 ########################################################################################################################
 
 configuration = {
-    "trainer": BasicTrainer,  # PUT NUM GPU BACK TO 1
+    "trainer": BayesianBasicTrainer,  # PUT NUM GPU BACK TO 1
     "trainer_config": {
         **pipeline_config,
         **predictor_config,
@@ -80,7 +82,7 @@ configuration = {
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
     "checkpoint_freq": 1,
-    "resources_per_trial": {"cpu": 6, "gpu": 1},
+    "resources_per_trial": {"cpu": 8, "gpu": 1},
     "scheduler": None,
     "search_alg": None,
 }

@@ -4,7 +4,7 @@ from recover.models.predictors import BilinearFilmMLPPredictor, AdvancedBayesian
  LinFilmWithFeatMLPPredictor
 from recover.utils.utils import get_project_root
 from recover.train import train_epoch,  BayesianBasicTrainer,\
-eval_epoch, BasicTrainer
+eval_epoch, BasicTrainer, train_epoch_bayesian
 import os
 from ray import tune
 from importlib import import_module
@@ -17,21 +17,19 @@ from importlib import import_module
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([2, 3, 4]),
+    "seed": tune.grid_search([2,4]), #([2, 3, 4]),
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
     "batch_size": 128,
     # Train epoch and eval_epoch to use
-    "train_epoch": train_epoch,
+    "train_epoch": train_epoch_bayesian,
     "eval_epoch": eval_epoch,
 }
 
 predictor_config = {
     "predictor": LinFilmWithFeatMLPPredictor,
-    "bayesian_predictor": False,
-    "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
-    "num_realizations": 0, 
+    "num_realizations": 10, 
     "predictor_layers":
         [
             2048,
@@ -70,7 +68,7 @@ dataset_config = {
 ########################################################################################################################
 
 configuration = {
-    "trainer": BasicTrainer,  # PUT NUM GPU BACK TO 1
+    "trainer": BayesianBasicTrainer,  # PUT NUM GPU BACK TO 1
     "trainer_config": {
         **pipeline_config,
         **predictor_config,

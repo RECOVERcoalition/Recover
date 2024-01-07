@@ -123,9 +123,9 @@ class ScaleMixtureGaussian(object): #scale mixture Gaussian
         
 
 # Hyperparameters for the mixture model
-PI =  0.25
+PI =  0.25 #if pi = 0 and sigma 2 = -4.6, it would be the same as after merge implementation
 SIGMA_1 = torch.FloatTensor([math.exp(-0)]) #torch.FloatTensor([0.005]) #
-SIGMA_2 = torch.FloatTensor([math.exp(-6)])
+SIGMA_2 = torch.FloatTensor([math.exp(-5)]) #
 
 class BayesianLinearModule(nn.Linear):
     def __init__(self, in_features, out_features):
@@ -483,9 +483,9 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         # layers.append(BayesianLinearModule(dim_i, dim_i_plus_1))
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
-        # else:
-        #     # layers.append(nn.Sigmoid() * 100)
-        #     layers.append(ScaledSigmoid(scale_factor=100))
+        else:
+            # layers.append(nn.Sigmoid() * 100)
+            layers.append(ScaledSigmoid(scale_factor=100))
         return layers
 
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -750,9 +750,9 @@ class BayesianMLPPredictor(torch.nn.Module):
         layers += self.bayesian_linear_layer(i, dim_i, dim_i_plus_1)
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
-        # else:
-        #     # layers.append(nn.Sigmoid() * 100)
-        #     layers.append(ScaledSigmoid(scale_factor=100))
+        else:
+            # layers.append(nn.Sigmoid() * 100)
+            layers.append(ScaledSigmoid(scale_factor=100))
         return layers
 
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
