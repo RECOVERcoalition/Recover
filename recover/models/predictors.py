@@ -127,7 +127,7 @@ class ScaleMixtureGaussian(object): #scale mixture Gaussian
 # Hyperparameters for the mixture model
 PI =  0.25 #if pi = 0 and sigma 2 = -4.6, it would be the same as after merge implementation
 SIGMA_1 = torch.FloatTensor([math.exp(-0)]) #torch.FloatTensor([0.005]) #
-SIGMA_2 = torch.FloatTensor([math.exp(-5)]) #
+SIGMA_2 = torch.FloatTensor([math.exp(-6)]) #
 
 class BayesianLinearModule(nn.Linear):
     def __init__(self, in_features, out_features):
