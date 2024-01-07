@@ -29,7 +29,9 @@ pipeline_config = {
 }
 
 predictor_config = {
-    "predictor": BayesianMLPPredictor,
+    "predictor": FilmMLPPredictor,
+    "num_realizations": 10,
+
     "predictor_layers":
         [
             2048,
@@ -81,7 +83,8 @@ configuration = {
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
     "checkpoint_freq": 1,
-    "resources_per_trial": {"cpu": 8, "gpu": 0},
+    "resources_per_trial": {"cpu": 8, "gpu": 1},
+
     "scheduler": None,
     "search_alg": None,
 }
