@@ -5,6 +5,7 @@ BilinearMLPPredictor, FilmMLPPredictor
 from recover.utils.utils import get_project_root
 from recover.train import train_epoch_bayesian,  BayesianBasicTrainer,\
 eval_epoch, BasicTrainer
+
 import os
 from ray import tune
 from importlib import import_module
@@ -30,6 +31,7 @@ pipeline_config = {
 predictor_config = {
     "predictor": FilmMLPPredictor,
     "num_realizations": 10,
+
     "predictor_layers":
         [
             2048,
@@ -56,7 +58,7 @@ dataset_config = {
     "test_set_prop": 0.1,
     "test_on_unseen_cell_line": False,
     "split_valid_train": "pair_level",
-    "cell_line": None,  # 'PC-3',
+    "cell_line": 'MCF7',  # 'PC-3',
     "target": "bliss_max",  # tune.grid_search(["css", "bliss", "zip", "loewe", "hsa"]),
     "fp_bits": 1024,
     "fp_radius": 2
@@ -82,6 +84,7 @@ configuration = {
     "checkpoint_at_end": False,
     "checkpoint_freq": 1,
     "resources_per_trial": {"cpu": 8, "gpu": 1},
+
     "scheduler": None,
     "search_alg": None,
 }

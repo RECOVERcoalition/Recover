@@ -76,7 +76,7 @@ dataset_config = {
 
 active_learning_config = {
     "ensemble_size": 5,
-    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]),
+    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]), #ProbabilityOfImprovementAcquisition, UCB, ExpectedImprovementAcquisition]), #([GreedyAcquisition, UCB, RandomAcquisition]),
     "patience_max": 4,
     "kappa": 1,
     "kappa_decrease_factor": 1,
