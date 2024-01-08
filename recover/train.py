@@ -498,38 +498,26 @@ class ActiveTrainer(BasicTrainer):
         else:
             seen_metrics = {}
 
-        eval_metrics, _, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
+                # Evaluate on valid set
+        eval_metrics, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
         
-        # Test on test set for given number of realizations
-        unseen_metrics = {}
-        realization_results, unseen_preds, drug_combs = self.eval_epoch(self.data, self.unseen_loader, self.model)
-        unseen_result = dict([("unseen/" + k, [v]) for k, v in realization_results.items()])
         
-        for i in range(self.num_realizations - 1):
-            realization_results, result_tensor, _ = self.eval_epoch(self.data, self.unseen_loader, self.model)
-            unseen_preds = torch.cat((unseen_preds, result_tensor), dim=1)
-            for k, v in realization_results.items():
-                unseen_result["unseen/" + k].append(v)
-                
-        for key in unseen_result:
-            unseen_metrics[str(key)+ "/mean"] = np.mean(unseen_result[key])
-            unseen_metrics[str(key)+ "/std"] = np.var(unseen_result[key])
-            
+        # Score unseen examples
+        unseen_metrics, unseen_preds = self.eval_epoch(self.data, self.unseen_loader, self.model)
+        
 
         active_scores = self.acquisition.get_scores(unseen_preds)
 
         # Build summary
         seen_metrics = [("seen/" + k, v) for k, v in seen_metrics.items()]
+        unseen_metrics = [("unseen/" + k, v) for k, v in unseen_metrics.items()]
         eval_metrics = [("eval/" + k, v) for k, v in eval_metrics.items()]
 
         metrics = dict(
             seen_metrics
+            + unseen_metrics
             + eval_metrics
         )
-        
-        metrics.update(dict(unseen_metrics))
-        
-        
 
         # Acquire new data
         print("query data")
@@ -546,8 +534,7 @@ class ActiveTrainer(BasicTrainer):
         metrics["seen_idxs_in_dataset"] = self.seen_idxs.detach().cpu().tolist()
 
         # Compute proportion of top 1% synergistic drugs which have been discovered
-        #query_set = set(query.detach().numpy())
-        query_set = set(query.detach().cpu().numpy())
+        query_set = set(query.detach().numpy())
         self.count += len(query_set & self.top_one_perc)
         metrics["top"] = self.count / len(self.top_one_perc)
 
@@ -583,6 +570,8 @@ class ActiveTrainer(BasicTrainer):
         self.training_it += 1
 
         return metrics
+       
+
 
     def train_between_queries(self):
         # Create the train and early_stop loaders for this iteration
