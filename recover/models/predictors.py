@@ -57,6 +57,7 @@ class FilmModule(torch.nn.Module):
 
 
 class FilmWithFeatureModule(torch.nn.Module):
+
     def __init__(self, num_cell_line_features, out_dim):
         super(FilmWithFeatureModule, self).__init__()
 
@@ -82,7 +83,8 @@ class FilmWithFeatureModule(torch.nn.Module):
         ]
 
 
-class LinearFilmWithFeatureModule(torch.nn.Module):
+
+class LinearFilmWithFeatureModule(nn.Module):
     def __init__(self, num_cell_line_features, out_dim):
         super(LinearFilmWithFeatureModule, self).__init__()
 
@@ -513,8 +515,8 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
 # Bilinear MLP
 ########################################################################################################################
 
+class BilinearMLPPredictor(nn.Module):
 
-class BilinearMLPPredictor(torch.nn.Module):
     def __init__(self, data, config, predictor_layers):
 
         super(BilinearMLPPredictor, self).__init__()
@@ -670,7 +672,6 @@ class BilinearLinFilmWithFeatMLPPredictor(BilinearFilmWithFeatMLPPredictor):
 # No permutation invariance MLP with Bayesian
 ########################################################################################################################
 
-
 class BayesianMLPPredictor(nn.Module):
     def __init__(self, data, config, predictor_layers):
 
@@ -781,8 +782,7 @@ class BayesianMLPPredictor(nn.Module):
 # No permutation invariance MLP 
 ########################################################################################################################
 
-
-class MLPPredictor(torch.nn.Module):
+class MLPPredictor(nn.Module):
     def __init__(self, data, config, predictor_layers):
 
         super(MLPPredictor, self).__init__()
@@ -907,8 +907,8 @@ class LinFilmWithFeatMLPPredictor(FilmWithFeatMLPPredictor):
 # Deep Synergy
 ########################################################################################################################
 
+class DeepSynergyPredictor(nn.Module):
 
-class DeepSynergyPredictor(torch.nn.Module):
     def __init__(self, data, config, predictor_layers):
         super(DeepSynergyPredictor, self).__init__()
 
