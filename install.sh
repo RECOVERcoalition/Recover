@@ -17,7 +17,7 @@ pip install -U "ray[tune]"
 pip install -e .
 
 # Install rdkit
-conda install -c rdkit rdkit
+conda install conda-forge::rdkit
 
 # Get Reservoir and install it in the environment (Git LFS NEEDED)
 git clone git@github.com:RECOVERcoalition/Reservoir.git
