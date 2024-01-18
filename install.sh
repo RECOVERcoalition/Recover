@@ -20,7 +20,7 @@ pip install -e .
 conda install conda-forge::rdkit
 
 # Get Reservoir and install it in the environment (Git LFS NEEDED)
-git clone git@github.com:RECOVERcoalition/Reservoir.git
+git clone https://github.com/RECOVERcoalition/Reservoir.git
 cd Reservoir/
 python setup.py develop
 cd ../
