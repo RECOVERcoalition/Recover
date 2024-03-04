@@ -27,6 +27,9 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": BilinearMLPPredictor,
+    "bayesian_predictor": False,
+    "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "num_realizations": 1, # For bayesian uncertainty
     "predictor_layers":
         [
             2048,
@@ -77,7 +80,7 @@ configuration = {
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
     "checkpoint_freq": 1,
-    "resources_per_trial": {"cpu": 8, "gpu": 0},
+    "resources_per_trial": {"cpu": 16, "gpu": 0},
     "scheduler": None,
     "search_alg": None,
 }

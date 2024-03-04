@@ -27,6 +27,9 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": PartiallyShuffledBilinearMLPPredictor,
+    "bayesian_predictor": False,
+    "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "num_realizations": 0, # For bayesian uncertainty
     "prop_of_shuffled_drugs": tune.grid_search([0., 0.25, 0.5, 0.75, 1.]),
     "predictor_layers":
         [

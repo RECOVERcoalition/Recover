@@ -1,9 +1,9 @@
 from recover.datasets.drugcomb_matrix_data import DrugCombMatrix
 from recover.models.models import Baseline, EnsembleModel
 from recover.models.predictors import BilinearFilmMLPPredictor, \
-    BilinearMLPPredictor, BilinearFilmWithFeatMLPPredictor, BilinearCellLineInputMLPPredictor
+    BilinearMLPPredictor, BilinearFilmWithFeatMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB
+from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB, ProbabilityOfImprovementAcquisition, ExpectedImprovementAcquisition
 from recover.train import train_epoch, eval_epoch, BasicTrainer, ActiveTrainer
 import os
 from ray import tune
@@ -16,7 +16,7 @@ from ray import tune
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([1, 2, 3]),
+    "seed": tune.grid_search([1]),
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
@@ -28,6 +28,10 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": BilinearMLPPredictor,
+    "bayesian_predictor": False,
+    "bayesian_before_merge": False, # For bayesian predictor implementation - Layers after merge are bayesian by default
+    "sigmoid": False,
+    "num_realizations": 0, # For bayesian uncertainty
     "predictor_layers":
         [
             2048,
