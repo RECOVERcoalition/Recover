@@ -63,10 +63,14 @@ def train_epoch(data, loader, model, optim):
 def train_epoch_bayesian(data, loader, model, optim):
     model.train()
     epoch_loss = 0
+    loss_kl = 0
+
     num_batches = len(loader)
+    batch = 1
 
     kl_loss = model.kl_loss()
-    kl_weight = 0.01
+
+    # kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False) 
 
     all_mean_preds = []
     all_targets = []
@@ -74,17 +78,31 @@ def train_epoch_bayesian(data, loader, model, optim):
     for _, drug_drug_batch in enumerate(loader):
         optim.zero_grad()
         out = model.forward(data, drug_drug_batch)
+        
         # Save all predictions and targets
         all_mean_preds.extend(out.mean(dim=1).tolist())
         all_targets.extend(drug_drug_batch[2].tolist())
 
         loss_mse = model.loss(out, drug_drug_batch)
-        kl_loss_value = model.kl_loss()
-        kl = kl_loss_value
-        loss = loss_mse + kl_weight * kl
-        loss.backward()
+
+        # kl_loss_value = model.kl_loss()
+        kl = kl_loss
+
+        # kl = kl_loss(model)
+
+        # kl_weight = 0.01
+        kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1)
+
+        # loss = loss_mse + kl_weight * kl
+
+        cost = loss_mse + kl_weight*kl
+
+        cost.backward()
         optim.step()
-        epoch_loss += loss.item()
+        epoch_loss += loss_mse.item()
+        loss_kl += kl * kl_weight
+
+        batch += 1
 
     epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
     
@@ -99,10 +117,18 @@ def train_epoch_bayesian(data, loader, model, optim):
         
         "comb_r_squared": epoch_comb_r_squared,
         # "mse": epoch_mse,
-        "loss_mse": loss_mse.item(),
-        "loss_kl": kl.item() * kl_weight,
+        # "loss_mse": loss_mse.item(),
+        "loss_mean": epoch_loss / num_batches,
+        # "loss_kl": kl.item() * kl_weight,
+        "loss_kl": loss_kl / num_batches,
         # "kl_weight": epoch_mse+kl.item(),
     }
+
+    summary_dict = {
+        "loss_mean": epoch_loss / num_batches,
+        "comb_r_squared": epoch_comb_r_squared
+    }
+
     print("Training", summary_dict)
     return summary_dict
 
@@ -143,7 +169,55 @@ def eval_epoch(data, loader, model):
 
     return summary_dict, all_out
 
+def bayesian_eval_epoch(data, loader, model):
+    model.eval()
 
+    epoch_loss = 0
+    num_batches = len(loader)
+
+    all_out = []
+    all_mean_preds = []
+    all_targets = []
+    all_combs = []
+
+    with torch.no_grad():
+        for _, drug_drug_batch in enumerate(loader):
+            out = model.forward(data, drug_drug_batch)
+
+            # Save all predictions and targets - rec_id_to_idx_dict
+            all_out.append(out)
+            all_mean_preds.extend(out.mean(dim=1).tolist())
+            all_targets.extend(drug_drug_batch[2].tolist())
+            all_combs.extend(drug_drug_batch[0].tolist())
+
+            loss = model.loss(out, drug_drug_batch)
+            epoch_loss += loss.item()
+        epoch_comb_r_squared = stats.linregress(all_mean_preds, all_targets).rvalue**2
+        epoch_spear = spearmanr(all_targets, all_mean_preds).correlation
+
+    summary_dict = {
+        "loss_mean": epoch_loss / num_batches,
+        "comb_r_squared": epoch_comb_r_squared,
+        "spearman": epoch_spear
+    }
+    
+    print("Testing", summary_dict, '\n')
+
+    all_out = torch.cat(all_out)
+
+    return summary_dict, all_out, all_combs
+
+
+"""
+Custom Aggregration function for obtaining results when training with multi cell-lines 
+
+Functionality: group data by the combination (permute invarient) and get maximum mean synergy score and the corresponding std
+"""
+def custom_agg(group):
+    max_row = group.loc[group['mean'].idxmax()]
+    return pd.Series({'combination': max_row['combination'],
+                  'mean': max_row['mean'],
+                  'std': max_row['std']})
 ########################################################################################################################
 # Basic trainer
 ########################################################################################################################
