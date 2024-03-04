@@ -22,6 +22,9 @@ class Baseline(torch.nn.Module):
         assert predictor_layers[-1] == 1
 
         self.predictor = self.get_predictor(data, config, predictor_layers)
+    
+    def kl_loss(self):
+        return self.predictor.kl_loss()
 
     def forward(self, data, drug_drug_batch):
         return self.predictor(data, drug_drug_batch)

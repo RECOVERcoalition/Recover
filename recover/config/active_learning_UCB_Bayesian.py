@@ -1,14 +1,12 @@
-from recover.datasets.drugcomb_matrix_data import DrugCombMatrix, DrugCombMatrixTrainAlmanac
-from recover.models.models import Baseline, EnsembleModel, PredictiveUncertaintyModel
-from recover.models.predictors import BilinearFilmMLPPredictor, AdvancedBayesianBilinearMLPPredictor, \
-    BilinearMLPPredictor, BilinearFilmWithFeatMLPPredictor, BilinearCellLineInputMLPPredictor
+from recover.datasets.drugcomb_matrix_data import DrugCombMatrix
+from recover.models.models import Baseline, EnsembleModel
+from recover.models.predictors import AdvancedBayesianBilinearMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB
-from recover.train import train_epoch,train_epoch_bayesian, eval_epoch, BasicTrainer,\
- ActiveTrainer, BayesianBasicTrainer
+from recover.acquisition.acquisition import RandomAcquisition, GreedyAcquisition, UCB,\
+ProbabilityOfImprovementAcquisition, ExpectedImprovementAcquisition
+from recover.train import train_epoch_bayesian, eval_epoch, BayesianBasicTrainer, ActiveTrainer
 import os
 from ray import tune
-import os
 
 ########################################################################################################################
 # Configuration
@@ -24,12 +22,13 @@ pipeline_config = {
     "weight_decay": 1e-2,
     "batch_size": 128,
     # Train epoch and eval_epoch to use
-    "train_epoch": train_epoch,
+    "train_epoch": train_epoch_bayesian,
     "eval_epoch": eval_epoch,
 }
 
 predictor_config = {
-    "predictor": BilinearFilmMLPPredictor,
+    "predictor": AdvancedBayesianBilinearMLPPredictor,
+    "num_realizations": 5,
     "predictor_layers":
         [
             2048,
@@ -39,15 +38,14 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
+    "stop": {"training_iteration": 1000, 'patience': 4}
 }
 
 model_config = {
-    "model": PredictiveUncertaintyModel,
+    "model": Baseline,
     # Loading pretrained model
-    "load_model_weights": tune.grid_search([True, False]),
-    "model_weights_file": os.path.join(get_project_root(), "RayLogs", "pretrain_ONEIL_Feb",
-                                       "BasicTrainer_a52e0_00000",
-                                       "checkpoint_000031", "model.pth"),
+    "load_model_weights": False,  # tune.grid_search([True, False]),
+    "model_weights_file": "",
 }
 
 """
@@ -61,11 +59,11 @@ List of cell line names:
 """
 
 dataset_config = {
-    "dataset": DrugCombMatrixTrainAlmanac,
+    "dataset": DrugCombMatrix,
     "study_name": 'ALMANAC',
     "in_house_data": 'without',
     "rounds_to_include": [],
-    "cell_line": None,  # Restrict to a specific cell line
+    "cell_line": 'MCF7',  # Restrict to a specific cell line
     "val_set_prop": 0.1,
     "test_set_prop": 0.,
     "test_on_unseen_cell_line": False,
@@ -78,13 +76,15 @@ dataset_config = {
 
 active_learning_config = {
     "ensemble_size": 5,
-    "acquisition": UCB,  # tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]),
+    "acquisition": tune.grid_search([GreedyAcquisition, UCB, RandomAcquisition]), #ProbabilityOfImprovementAcquisition, UCB, ExpectedImprovementAcquisition]), #([GreedyAcquisition, UCB, RandomAcquisition]),
     "patience_max": 4,
     "kappa": 1,
     "kappa_decrease_factor": 1,
     "n_epoch_between_queries": 500,
     "acquire_n_at_a_time": 30,
-    "n_initial": 10,
+    "n_initial": 30,
+    # "threshold": 1,  # Initial threshold for improvement
+    # "threshold_decrease_factor": 1,  # Factor to decrease the threshold
 }
 
 ########################################################################################################################
@@ -101,12 +101,12 @@ configuration = {
         **active_learning_config
     },
     "summaries_dir": os.path.join(get_project_root(), "RayLogs"),
-    "memory": 3000,
-    "stop": {"training_iteration": 50, 'all_space_explored': 1},
+    "memory": 1800,
+    "stop": {"training_iteration": 1000, 'all_space_explored': 1},
     "checkpoint_score_attr": 'eval/comb_r_squared',
     "keep_checkpoints_num": 1,
     "checkpoint_at_end": False,
-    "checkpoint_freq": 0,
+    "checkpoint_freq": 1,
     "resources_per_trial": {"cpu": 8, "gpu": 0},
     "scheduler": None,
     "search_alg": None,
