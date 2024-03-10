@@ -58,19 +58,18 @@ def train_epoch(data, loader, model, optim):
 
     return summary_dict
 
-
 # Bayesian Epoch loops
-def train_epoch_bayesian(data, loader, model, optim):
+def train_epoch_bayesian(data, loader, model, optim, config):
+    
+    bayesian_single_prior = config["bayesian_single_prior"]
+    
+    
     model.train()
     epoch_loss = 0
     loss_kl = 0
 
     num_batches = len(loader)
     batch = 1
-
-    # kl_loss = model.kl_loss()
-
-    kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False) 
 
     all_mean_preds = []
     all_targets = []
@@ -85,14 +84,17 @@ def train_epoch_bayesian(data, loader, model, optim):
 
         loss_mse = model.loss(out, drug_drug_batch)
 
-        # kl_loss_value = model.kl_loss()
-        # kl = kl_loss
+        if bayesian_single_prior:
+            kl_loss_default = bnn.BKLLoss(reduction='mean', last_layer_only=False) 
+            kl = kl_loss_default(model)
+    
+        else:
+            kl_loss_value = model.kl_loss()
+            kl = kl_loss
 
-        kl = kl_loss(model)
-
-        # kl_weight = 0.01
         kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1)
 
+        # kl_weight = 0.01
         cost = loss_mse + kl_weight*kl
 
         cost.backward()
@@ -120,11 +122,6 @@ def train_epoch_bayesian(data, loader, model, optim):
         "loss_kl" : loss_kl / num_batches,
         # "kl_weight": epoch_mse+kl.item(),
         # "loss_kl": kl.item() * kl_weight,
-    }
-
-    summary_dict = {
-        "loss_mean": epoch_loss / num_batches,
-        "comb_r_squared": epoch_comb_r_squared
     }
 
     print("Training", summary_dict)
@@ -261,6 +258,7 @@ class BasicTrainer(tune.Trainable):
             self.train_loader,
             self.model,
             self.optim,
+            self.config
         )
 
         eval_metrics, _= self.eval_epoch(self.data, self.valid_loader, self.model)
@@ -302,6 +300,9 @@ class BayesianBasicTrainer(tune.Trainable):
         print("Initializing regular training pipeline")
 
         self.batch_size = config["batch_size"]
+        self.bayesian_single_prior = config["bayesian_single_prior"]
+        print("What's the value. show me!", self.bayesian_single_prior)
+
         device_type = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device_type)
         self.training_it = 0
@@ -402,6 +403,7 @@ class BayesianBasicTrainer(tune.Trainable):
             self.train_loader,
             self.model,
             self.optim,
+            self.config
         )
 
         eval_metrics, _ = self.eval_epoch(self.data, self.valid_loader, self.model)
@@ -920,25 +922,6 @@ def train(configuration):
         # Use tune
         ###########################################
 
-        # # Set memory monitor threshold
-        # os.environ["RAY_memory_usage_threshold"] = "0.95" 
-
-        # # Set memory monitor refresh interval 
-        # os.environ["RAY_memory_monitor_refresh_ms"] = "0"  
-
-
-        # # Start Ray with command-line options
-        # ray_start_cmd = [
-        #     "ray",
-        #     "start",
-        #     "--head",
-        #     f"--num-cpus={configuration['resources_per_trial']['cpu']}",
-        #     f"--num-gpus={configuration['resources_per_trial']['gpu']}",
-        #     "--max-worker-restarts=3",  # Set the maximum number of times a worker process can be restarted
-        #     "--max-task-retries=2",     # Set the maximum number of times a task can be retried
-        # ]
-        # ray.init()
-
         ray.init(
             num_cpus=configuration["resources_per_trial"]["cpu"],
             num_gpus=configuration["resources_per_trial"]["gpu"],
@@ -948,6 +931,7 @@ def train(configuration):
         print("Sleeping for %d seconds" % time_to_sleep)
         time.sleep(time_to_sleep)
         print("Woke up.. Scheduling")
+
 
         tune.run(
             configuration["trainer"],
