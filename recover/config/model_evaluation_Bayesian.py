@@ -17,6 +17,7 @@ pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
     "seed": tune.grid_search([2,3,4]),
+    "bayesian_single_prior": False,
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
@@ -28,6 +29,7 @@ pipeline_config = {
 
 predictor_config = {
     "predictor": AdvancedBayesianBilinearMLPPredictor,
+    
     "predictor_layers":
         [
             2048,
@@ -82,4 +84,5 @@ configuration = {
     "resources_per_trial": {"cpu": 8, "gpu": 0},
     "scheduler": None,
     "search_alg": None,
+    "bayesian_single_prior": False
 }

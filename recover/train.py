@@ -62,7 +62,7 @@ def train_epoch(data, loader, model, optim):
 def train_epoch_bayesian(data, loader, model, optim, config):
     
     bayesian_single_prior = config["bayesian_single_prior"]
-    
+    print("Lets see: ", bayesian_single_prior)
     
     model.train()
     epoch_loss = 0
@@ -90,7 +90,7 @@ def train_epoch_bayesian(data, loader, model, optim, config):
     
         else:
             kl_loss_value = model.kl_loss()
-            kl = kl_loss
+            kl = kl_loss_value
 
         kl_weight = pow(2, num_batches-batch)/(pow(2, num_batches)-1)
 
