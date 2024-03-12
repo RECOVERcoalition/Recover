@@ -62,7 +62,6 @@ def train_epoch(data, loader, model, optim):
 def train_epoch_bayesian(data, loader, model, optim, config):
     
     bayesian_single_prior = config["bayesian_single_prior"]
-    print("Lets see: ", bayesian_single_prior)
     
     model.train()
     epoch_loss = 0
@@ -645,7 +644,7 @@ class ActiveTrainer(BasicTrainer):
 
         for _ in range(self.n_epoch_between_queries):
             # Perform several training epochs. Save only metrics from the last epoch
-            train_metrics = self.train_epoch(self.data, train_loader, self.model, self.optim)
+            train_metrics = self.train_epoch(self.data, train_loader, self.model, self.optim, self.config)
             early_stop_metrics, _ = self.eval_epoch(self.data, early_stop_loader, self.model)
             
             if early_stop_metrics["comb_r_squared"] > best_eval_r2:

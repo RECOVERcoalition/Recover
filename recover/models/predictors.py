@@ -106,6 +106,14 @@ class LinearFilmWithFeatureModule(nn.Module):
             + condit[:, self.out_dim:],
             cell_line_features
         ]
+class SimpleBayesianLinearModule(bnn.BayesLinear):
+    def __init__(self, in_features, out_features, prior_mu=0, prior_sigma=0.01):
+        super(SimpleBayesianLinearModule, self).__init__(prior_mu=prior_mu, prior_sigma=prior_sigma, in_features=in_features, out_features=out_features)
+
+    def forward(self, input):
+        x, cell_line = input[0], input[1]
+        return [super().forward(x), cell_line]
+
 
 class ScaleMixtureGaussian(object): #scale mixture Gaussian
     def __init__(self, pi, sigma1, sigma2):
@@ -356,6 +364,7 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
         
         # self.layers = BayesianLinearModule(in_features, out_features)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
         
         assert 0 < self.merge_n_layers_before_the_end < len(predictor_layers)
@@ -479,9 +488,9 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
         # Add a Bayesian layer to the list of layers
         # layers.extend(self.bayesian_linear_layer(i, mu, sigma, dim_i, dim_i_plus_1))
         # bayesian_linear_layer = [BayesianLinearModule(dim_i, dim_i_plus_1)]
-
+        
         layers.extend(self.bayesian_linear_layer(i, dim_i, dim_i_plus_1))
-        # layers += self.bayesian_linear_layer(i, dim_i, dim_i_plus_1)
+        
         
         if i != len(self.layer_dims) - 2:
             layers.append(ReLUModule())
@@ -493,7 +502,10 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
         # Return a Bayesian linear layer
         # return [BayesianLinearDropoutModule(dim_i, dim_i_plus_1)]
-        return [BayesianLinearModule(dim_i, dim_i_plus_1)]
+        if self.bayesian_single_prior:
+            return [SimpleBayesianLinearModule(dim_i, dim_i_plus_1)]
+        else:
+            return [BayesianLinearModule(dim_i, dim_i_plus_1)]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         # Return a linear layer
@@ -501,14 +513,17 @@ class AdvancedBayesianBilinearMLPPredictor(nn.Module): #BAYESIAN ADD ON
 
     def kl_loss(self): 
         # Calculate the total KL divergence loss
-        kl = 0
-        for layer in self.before_merge_mlp:
-            if hasattr(layer, "kl_loss"):
-                kl += layer.kl_loss()
-        for layer in self.after_merge_mlp:
-            if hasattr(layer, "kl_loss"):
-                kl += layer.kl_loss()
-        return kl
+        if self.bayesian_single_prior:
+            pass    
+        else:
+            kl = 0
+            for layer in self.before_merge_mlp:
+                if hasattr(layer, "kl_loss"):
+                    kl += layer.kl_loss()
+            for layer in self.after_merge_mlp:
+                if hasattr(layer, "kl_loss"):
+                    kl += layer.kl_loss()
+            return kl
     
 #Recover Original MLPs 
 ########################################################################################################################
@@ -630,6 +645,7 @@ class BilinearMLPPredictor(nn.Module):
 class BilinearFilmMLPPredictor(AdvancedBayesianBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(BilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
@@ -643,6 +659,7 @@ class BilinearFilmWithFeatMLPPredictor(AdvancedBayesianBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         self. cl_features_dim = data.cell_line_features.shape[1]
         super(BilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -664,6 +681,7 @@ class BilinearFilmWithFeatMLPPredictor(AdvancedBayesianBilinearMLPPredictor):
 class BilinearLinFilmWithFeatMLPPredictor(BilinearFilmWithFeatMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(BilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -685,6 +703,8 @@ class BayesianMLPPredictor(nn.Module):
 
         self.merge_n_layers_before_the_end = config["merge_n_layers_before_the_end"]
         self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
+
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
         assert 0 < self.merge_n_layers_before_the_end < len(predictor_layers)
 
@@ -762,22 +782,28 @@ class BayesianMLPPredictor(nn.Module):
 
     def bayesian_linear_layer(self, i, dim_i, dim_i_plus_1):
         # Return a Bayesian linear layer
-        return [BayesianLinearModule(dim_i, dim_i_plus_1)]
+        if self.bayesian_single_prior:
+            return [SimpleBayesianLinearModule(dim_i, dim_i_plus_1)]
+        else:
+            return [BayesianLinearModule(dim_i, dim_i_plus_1)]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         # Return a linear layer
         return [LinearModule(dim_i, dim_i_plus_1)]
 
     def kl_loss(self): 
+        if self.bayesian_single_prior:
+            pass
         # Calculate the total KL divergence loss
-        kl = 0
-        for layer in self.before_merge_mlp:
-            if hasattr(layer, "kl_loss"):
-                kl += layer.kl_loss()
-        for layer in self.after_merge_mlp:
-            if hasattr(layer, "kl_loss"):
-                kl += layer.kl_loss()
-        return kl
+        else:
+            kl = 0
+            for layer in self.before_merge_mlp:
+                if hasattr(layer, "kl_loss"):
+                    kl += layer.kl_loss()
+            for layer in self.after_merge_mlp:
+                if hasattr(layer, "kl_loss"):
+                    kl += layer.kl_loss()
+            return kl
 
 ########################################################################################################################
 # No permutation invariance MLP 
@@ -869,6 +895,7 @@ class MLPPredictor(nn.Module):
 class FilmMLPPredictor(BayesianMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(FilmMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -878,6 +905,7 @@ class FilmMLPPredictor(BayesianMLPPredictor):
 class FilmWithFeatMLPPredictor(BayesianMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         self. cl_features_dim = data.cell_line_features.shape[1]
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         super(FilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
         
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -899,6 +927,7 @@ class FilmWithFeatMLPPredictor(BayesianMLPPredictor):
 class LinFilmWithFeatMLPPredictor(FilmWithFeatMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(LinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
@@ -1010,6 +1039,7 @@ class ShuffledBilinearMLPPredictor(AdvancedBayesianBilinearMLPPredictor):
 class ShuffledBilinearFilmMLPPredictor(ShuffledBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(ShuffledBilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), FilmModule(self.num_cell_lines, self.layer_dims[i + 1])]
@@ -1018,6 +1048,7 @@ class ShuffledBilinearFilmMLPPredictor(ShuffledBilinearMLPPredictor):
 class ShuffledBilinearFilmWithFeatMLPPredictor(ShuffledBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         self. cl_features_dim = data.cell_line_features.shape[1]
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         super(ShuffledBilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -1039,6 +1070,7 @@ class ShuffledBilinearFilmWithFeatMLPPredictor(ShuffledBilinearMLPPredictor):
 class ShuffledBilinearLinFilmWithFeatMLPPredictor(ShuffledBilinearFilmWithFeatMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(ShuffledBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
         return [LinearModule(dim_i, dim_i_plus_1), LinearFilmWithFeatureModule(self. cl_features_dim, self.layer_dims[i + 1])]
@@ -1071,6 +1103,7 @@ class PartiallyShuffledBilinearMLPPredictor(AdvancedBayesianBilinearMLPPredictor
 class PartiallyShuffledBilinearFilmMLPPredictor(PartiallyShuffledBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(PartiallyShuffledBilinearFilmMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -1079,6 +1112,7 @@ class PartiallyShuffledBilinearFilmMLPPredictor(PartiallyShuffledBilinearMLPPred
 class PartiallyShuffledBilinearFilmWithFeatMLPPredictor(PartiallyShuffledBilinearMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         self. cl_features_dim = data.cell_line_features.shape[1]
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         super(PartiallyShuffledBilinearFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
         
 
@@ -1101,6 +1135,7 @@ class PartiallyShuffledBilinearFilmWithFeatMLPPredictor(PartiallyShuffledBilinea
 class PartiallyShuffledBilinearLinFilmWithFeatMLPPredictor(PartiallyShuffledBilinearFilmWithFeatMLPPredictor):
     def __init__(self, data, config, predictor_layers):
         super(PartiallyShuffledBilinearLinFilmWithFeatMLPPredictor, self).__init__(data, config, predictor_layers)
+        self.bayesian_single_prior = config["bayesian_single_prior"]
         
 
     def linear_layer(self, i, dim_i, dim_i_plus_1):
@@ -1109,15 +1144,6 @@ class PartiallyShuffledBilinearLinFilmWithFeatMLPPredictor(PartiallyShuffledBili
 ############################
 #Advanced Bayesian with one prior
 ############################
-class SimpleBayesianLinearModule(bnn.BayesLinear):
-    def __init__(self, in_features, out_features, prior_mu=0, prior_sigma=0.01):
-        super(SimpleBayesianLinearModule, self).__init__(prior_mu=prior_mu, prior_sigma=prior_sigma, in_features=in_features, out_features=out_features)
-
-    def forward(self, input):
-        x, cell_line = input[0], input[1]
-        return [super().forward(x), cell_line]
-
-
 class simpleBayesianBilinearMLPPredictor(torch.nn.Module):
     def __init__(self, data, config, predictor_layers):
 
@@ -1132,6 +1158,8 @@ class simpleBayesianBilinearMLPPredictor(torch.nn.Module):
             
         self.merge_n_layers_before_the_end = config["merge_n_layers_before_the_end"]
         self.merge_dim = self.layer_dims[-self.merge_n_layers_before_the_end - 1]
+
+        self.bayesian_single_prior = config["bayesian_single_prior"]
 
         assert 0 < self.merge_n_layers_before_the_end < len(predictor_layers)
 

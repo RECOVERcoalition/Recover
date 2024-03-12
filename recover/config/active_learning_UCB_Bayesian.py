@@ -29,6 +29,7 @@ pipeline_config = {
 predictor_config = {
     "predictor": AdvancedBayesianBilinearMLPPredictor,
     "num_realizations": 5,
+    "bayesian_single_prior": True,
     "predictor_layers":
         [
             2048,
