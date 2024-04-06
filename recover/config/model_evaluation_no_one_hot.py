@@ -1,8 +1,10 @@
 from recover.datasets.drugcomb_matrix_data import DrugCombMatrix, DrugCombMatrixNoFP, DrugCombMatrixNoOneHot
 from recover.models.models import Baseline
-from recover.models.predictors import BilinearFilmMLPPredictor, BilinearMLPPredictor
+from recover.models.predictors import BilinearFilmMLPPredictor, AdvancedBayesianBilinearMLPPredictor,\
+BilinearMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.train import train_epoch, eval_epoch, BasicTrainer
+from recover.train import train_epoch_bayesian,  BayesianBasicTrainer,\
+eval_epoch, BasicTrainer
 import os
 from ray import tune
 from importlib import import_module

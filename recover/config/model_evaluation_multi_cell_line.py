@@ -1,8 +1,10 @@
 from recover.datasets.drugcomb_matrix_data import DrugCombMatrix
 from recover.models.models import Baseline
-from recover.models.predictors import BilinearFilmMLPPredictor, BilinearMLPPredictor
+from recover.models.predictors import BilinearFilmMLPPredictor, AdvancedBayesianBilinearMLPPredictor,\
+BilinearMLPPredictor
 from recover.utils.utils import get_project_root
-from recover.train import train_epoch, eval_epoch, BasicTrainer
+from recover.train import train_epoch_bayesian,  BayesianBasicTrainer,\
+eval_epoch, BasicTrainer
 import os
 from ray import tune
 from importlib import import_module
@@ -15,13 +17,14 @@ from importlib import import_module
 pipeline_config = {
     "use_tune": True,
     "num_epoch_without_tune": 500,  # Used only if "use_tune" == False
-    "seed": tune.grid_search([2, 3, 4]),
+    "seed": tune.grid_search([3]),
+
     # Optimizer config
     "lr": 1e-4,
     "weight_decay": 1e-2,
     "batch_size": 128,
     # Train epoch and eval_epoch to use
-    "train_epoch": train_epoch,
+    "train_epoch": train_epoch_bayesian,
     "eval_epoch": eval_epoch,
 }
 
@@ -36,6 +39,7 @@ predictor_config = {
         ],
     "merge_n_layers_before_the_end": 2,  # Computation on the sum of the two drug embeddings for the last n layers
     "allow_neg_eigval": True,
+    "stop": {"training_iteration": 1000, 'patience': 10}
 }
 
 model_config = {
@@ -63,7 +67,7 @@ dataset_config = {
 ########################################################################################################################
 
 configuration = {
-    "trainer": BasicTrainer,  # PUT NUM GPU BACK TO 1
+    "trainer": BayesianBasicTrainer,  # PUT NUM GPU BACK TO 1
     "trainer_config": {
         **pipeline_config,
         **predictor_config,

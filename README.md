@@ -1,23 +1,40 @@
-# RECOVER: sequential model optimization platform for combination drug repurposing identifies novel synergistic compounds *in vitro*
+# Machine Learning Driven Candidate Compound Generation for Drug Repurposing
+Based on RECOVER: sequential model optimization platform for combination drug repurposing identifies novel synergistic compounds *in vitro*
 [![DOI](https://zenodo.org/badge/320327566.svg)](https://zenodo.org/badge/latestdoi/320327566)
 
-RECOVER is a platform that can guide wet lab experiments to quickly discover synergistic drug combinations active 
-against a cancer cell line, requiring substantially less screening than an exhaustive evaluation 
-([preprint](https://arxiv.org/abs/2202.04202)).
+This repository is an implementation of RECOVER, a platform that can guide wet lab experiments to quickly discover synergistic drug combinations,
+([preprint](https://arxiv.org/abs/2202.04202)), howerver instead of using an ensemble model to get Synergy predictions with uncertainty, we used multiple realization of a Bayesian Neural Network model. 
+Since the weights are drawn from a distribution, they differ for every run of a trained model and hence give different results. The goal was to get a more precise uncertainty and achieve i quicker since the model doesn't have to be trained multiple times. 
+
+<div>
+  <img src="docs/images/ProjectInfographics.png" alt="Overview" width="500"/>
+</div>
 
 
-![Overview](docs/images/overview.png "Overview")
+## Weighted Uncertainty in Bayesian Neural Networks
+Incorporating weighted uncertainty into Bayesian Neural Networks (BNNs) enhances their predictive capabilities, allowing for a more nuanced understanding of model confidence. Inspired by the research outlined in the article, the implementation focused on introducing weighted uncertainty through a Bayesian framework. Implemetation is inspired by [bayes-by-backprop](https://github.com/nitarshan/bayes-by-backprop/tree/master)
 
+### Implementation Details
+1. **Layers Module:**  
+   Implemented a versatile layers module within the `models/predictors.py` file, providing flexibility by incorporating both weighted uncertainty with and without dropout. Dropout method is inspired by [variational-dropout-sparsifies-dnn](https://github.com/bayesgroup/variational-dropout-sparsifies-dnn)
+
+2. **Bayesian Neural Network:**  
+   Extended the predictive capabilities by incorporating a Bayesian Neural Network into the `models/predictors.py` file. This empowers the model to leverage uncertainty information for more informed predictions.
+
+3. **KL Loss Method:**  
+   Implemented the Kullback-Leibler (KL) loss method, as suggested by the article, within the `models/predictors.py` file. This addition is crucial for training the Bayesian model effectively, ensuring convergence to a meaningful weight distribution.
+
+4. **Configuration Files:**  
+   Introduced configuration files tailored for the Bayesian basic trainer and active trainer in the `config` directory. These files capture the necessary settings for training Bayesian models, providing a clear and organized structure for experimentation.
+
+5. **Codebase Modifications:**  
+   Ensured seamless integration by making necessary adjustments in the `train.py` and `models/model.py` files. These modifications align the training process with the new Bayesian approach, allowing for the proper utilization of weighted uncertainty.
+
+The implemented changes collectively enhance the expressiveness and reliability of the Bayesian Neural Network, paving the way for improved model interpretability and performance. By enabling weighted uncertainty, the model gains the ability to assign varying degrees of importance to different data points during training, ultimately leading to more robust and accurate predictions.
 ## Environment setup
 
-**Requirements**: Anaconda (https://www.anaconda.com/) and Git LFS (https://git-lfs.github.com/). Please make sure 
-both are installed on the system prior to running installation.
-
-**Installation**: enter the command `source install.sh` and follow the instructions. This will create a conda 
-environment named **recover** and install all the required packages including the 
-[reservoir](https://github.com/RECOVERcoalition/Reservoir) package that stores the primary data acquisition scripts.
-
-In case you have any issue with the installation procedure of the *reservoir*, you can access and download all files directly from this [google drive](https://drive.google.com/drive/folders/1MYeDoAi0-qnhSJTvs68r861iMOdoqYki?usp=share_link).
+**Requirements and Installation**: 
+For all the requirements and installation steps check th orginal RECOVER repository (https://github.com/RECOVERcoalition/Recover.git). 
 
 ## Running the pipeline
 
@@ -31,9 +48,3 @@ For example, to run the pipeline with configuration from
 the file `model_evaluation.py`, run `python train.py --config model_evaluation`.
 
 Log files will automatically be created to save the results of the experiments.
-
-## Note
-
-This Recover repository is based on research funded by (or in part by) the Bill & Melinda Gates Foundation. The 
-findings and conclusions contained within are those of the authors and do not necessarily reflect positions or policies 
-of the Bill & Melinda Gates Foundation.
